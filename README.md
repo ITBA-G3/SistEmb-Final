@@ -18,10 +18,9 @@ Sacar señal de audio, metadata, etc.
 
 ### Display 
 
-> TBD
+> to be determined (a determinar, en idioma español)
 
 - Driver para poder usar la matriz de leds.
-- Hacer el vúmetro.
 
 ### I2S & reproduccion de audio
 
@@ -36,6 +35,8 @@ Sacar señal de audio, metadata, etc.
 
 - Ya está implementado el driver del encoder $\to$ revisarlo de todas formas.
 - Si es necesario implementar un driver o interrupcion para botones.
+
+- ver que onda el vumetro
 
 ## FSM
 
