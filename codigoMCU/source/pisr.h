@@ -1,7 +1,7 @@
 /***************************************************************************//**
   @file     pisr.h
   @brief    Periodic Interrupt (PISR) driver
-  @author   Group 4
+  @author   Nicolás Magliola
  ******************************************************************************/
 
 #ifndef _PISR_H_
@@ -14,18 +14,31 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+
 /*******************************************************************************
  * CONSTANT AND MACRO DEFINITIONS USING #DEFINE
  ******************************************************************************/
 
-#define PISR_FREQUENCY_HZ	2000U
-#define PISR_CANT			8
+#define PISR_FREQUENCY_HZ 100000U
+
+#define PISR_CANT        8
+
 
 /*******************************************************************************
  * ENUMERATIONS AND STRUCTURES AND TYPEDEFS
  ******************************************************************************/
 
 typedef void (*pisr_callback_t) (void);
+
+typedef struct
+{
+	pisr_callback_t callback_ptr;
+	unsigned int period;
+} pisr_callback_type;
+
+/*******************************************************************************
+ * VARIABLE PROTOTYPES WITH GLOBAL SCOPE
+ ******************************************************************************/
 
 /*******************************************************************************
  * FUNCTION PROTOTYPES WITH GLOBAL SCOPE
@@ -38,6 +51,9 @@ typedef void (*pisr_callback_t) (void);
  * @return Registration succeed
  */
 bool pisrRegister (pisr_callback_t fun, unsigned int period);
+
+void SysTick_Init (void);
+
 
 /*******************************************************************************
  ******************************************************************************/
