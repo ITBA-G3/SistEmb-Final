@@ -10,136 +10,100 @@
 #include "encoder.h"
 #include <stdbool.h>
 #include "gpio.h"
+#include "pisr.h"
 #include "board.h"
 #include "../SDK/CMSIS/MK64F12.h"
-#include "../../tick.h"
-/*******************************************************************************
- * CONSTANT AND MACRO DEFINITIONS USING #DEFINE
- ******************************************************************************/
-
-#define PORT_INTERRUPT_FALLING 1010 //1010 ISF flag and Interrupt on falling-edge.
 
 /*******************************************************************************
- * STATIC VARIABLES DEFINITIONS
+ * INTERRUPT SERVICE ROUTINES
  ******************************************************************************/
-
-static uint8_t encAction = ENC_STILL;
-static uint8_t switchState = HIGH;
-
-OS_Q* QSwitch = 0;
-OS_Q* QEncoder = 0;
+static void SwitchPressed_IRQ(void);
+static void RotateEncoder_IRQ(void);
 
 /*******************************************************************************
- * FUNCTION PROTOTYPES FOR PRIVATE FUNCTIONS WITH FILE LEVEL SCOPE
+ * VARIABLES WITH GLOBAL SCOPE
  ******************************************************************************/
-
-void switchCallback (void);
+static int8_t turns; // Number of turns (positive or negative, depending on the direction)
+static int8_t button;
+static int8_t encoderLastState;
 
 /*******************************************************************************
- *******************************************************************************
-                        GLOBAL FUNCTION DEFINITIONS
- *******************************************************************************
+ * INITIALIZATION FUNCTION
  ******************************************************************************/
-//RCHA = 18, RCHB = 19, RSWITCH = 20 (PORTB)
-void encoderInit(OS_Q* queueENC) //tiene que inicializar los pines y las interrupciones por flanco de las mismas.
-{
-	PORTB->PCR[20] = 0x0;
-	PORTB->PCR[19] = 0x0;
-	PORTB->PCR[18] = 0x0;
-	gpioMode(PIN_ENCODER_SWITCH,INPUT);
-	gpioMode(PIN_ENCODER_B,INPUT);
-	gpioMode(PIN_ENCODER_A,INPUT);
+void encoderInit(void) {
+    // Initialize the encoder pins
+	  PORTB->PCR[20] = 0x0;
+	  PORTB->PCR[19] = 0x0;
+	  PORTB->PCR[18] = 0x0;
 
-	QEncoder = queueENC;
+	  gpioMode(PIN_ENCODER_A,INPUT);
+    gpioMode(PIN_ENCODER_B,INPUT);
+    gpioMode(PIN_ENCODER_SWITCH,INPUT);
 
-	tickAdd(encoderCallback,1);
-	tickAdd(switchCallback,5);
+    turns = 0;
+    button = 0;
+    encoderLastState = (gpioRead(PIN_ENCODER_A)<<1) + gpioRead(PIN_ENCODER_B); // Read the initial state of the encoder
+
+	  pisrRegister(SwitchPressed_IRQ,5);
+	  pisrRegister(RotateEncoder_IRQ,1);
 }
-
-/*
- * La idea es que esto actualiza encAction con el ultimo giro, "es trabajo de la app"
- * volver esa variable a STILL una vez que se usó el valor leído, que simboliza que el
- * encoder está quieto. No tiene sentido que la interrupción vuelva el valor a STILL.
- */
-void encoderCallback(void)
-{
-	OS_ERR os_err;
-	static uint8_t firstEdge = 0; //En esta variable se almacena el canal(A=1,B=2) que tuvo el primer flanco descendente
-	static uint8_t statusChannelA, statusChannelB;
-	statusChannelA = gpioRead(PIN_ENCODER_A);
-	statusChannelB = gpioRead(PIN_ENCODER_B);
-	if(firstEdge == 0)
-	{
-		if(statusChannelA == LOW && statusChannelB == HIGH)
-		{
-			firstEdge = 1;
-			encAction = ENC_RIGHT;
-		}
-		else if(statusChannelA == HIGH && statusChannelB == LOW)
-		{
-			firstEdge = 2;
-			encAction = ENC_LEFT;
-		}
-	}
-	else
-	{
-		if(statusChannelA == HIGH && statusChannelB == HIGH)
-		{
-			firstEdge = 0;
-			OSQPost(QEncoder, &encAction, sizeof(encAction), OS_OPT_POST_FIFO, &os_err);
-		}
-	}
-}
-
-void switchCallback (void)
-{
-	OS_ERR os_err;
-	static uint8_t lastSWstate;
-
-	lastSWstate = switchState;
-	switchState = gpioRead(PIN_ENCODER_SWITCH);
-	
-	if ((lastSWstate == LOW) && (switchState == HIGH))
-	{
-		encAction = SW_FLANK;
-		OSQPost(QEncoder, &encAction, sizeof(switchState), OS_OPT_POST_FIFO, &os_err);
-	}
-}
-
-uint8_t getEncDir (void)
-{
-	return encAction;
-}
-
-void resetEncDir (void)
-{
-	encAction = ENC_STILL;
-}
-
-uint8_t getSwitchState (void)
-{
-	return switchState;
-}
-
-void buzzerStart(void)
-{
-	gpioWrite(PIN_BUZZER, HIGH);
-}
-void buzzerStop(void)
-{
-	gpioWrite(PIN_BUZZER, LOW);
-}
-//void resetSwitchState (void)
-//{
-//	switchState = SW_RELEASED; //0 = released
-//}
 
 /*******************************************************************************
- *******************************************************************************
-                        LOCAL FUNCTION DEFINITIONS
- *******************************************************************************
+ * FUNCTION DEFINITIONS
  ******************************************************************************/
-
 
 /*******************************************************************************
+ * INTERRUPTIONS DEFINITIONS
  ******************************************************************************/
+
+// @brief This function is called when the encoder switch is pressed, it increments the button state
+static void SwitchPressed_IRQ(void) {
+    static uint8_t lastState = 0;
+    uint8_t switchState = gpioRead(PIN_ENCODER_SWITCH);
+
+    if (switchState != lastState && lastState == SW_PRESSED) { //SW_PRESSED available in board.h
+        button++; // Increment the button state (remember to reset it in the app)
+    }
+
+    lastState = switchState; //for the next iteration
+}
+
+// @brief This function is called when the encoder is rotated, it increments or decrements the turns variable
+// depending on the direction of the rotation (decrement if counter-clockwise, increment if clockwise)
+static void RotateEncoder_IRQ(void) {
+    uint8_t currentState = (gpioRead(PIN_ENCODER_A)<<1) + gpioRead(PIN_ENCODER_B); // Read the current state of the encoder
+
+    switch (currentState) { // remember that the encoder sequence is 11, 01, 00, 10
+                            // when moving in clockwise
+        case STATE_00:
+            if (encoderLastState == STATE_01) { // clockwise
+                turns++;
+            } else if (encoderLastState == STATE_10) { // counter clockwise
+                turns--;
+            }
+            break;
+        case STATE_01:
+            if (encoderLastState == STATE_11) { // clockwise
+                turns++;
+            } else if (encoderLastState == STATE_00) { // counter clockwise
+                turns--;
+            }
+            break;
+        case STATE_10:
+            if (encoderLastState == STATE_00) { // clockwise
+                turns++;
+            } else if (encoderLastState == STATE_11) { // counter clockwise
+                turns--;
+            }
+            break;
+        case STATE_11:
+            if (encoderLastState == STATE_10) { // clockwise
+                turns++;
+            } else if (encoderLastState == STATE_01) { // counter clockwise
+                turns--;
+            }
+            break;
+    }
+ 
+    encoderLastState = currentState; //for the next iteration
+}

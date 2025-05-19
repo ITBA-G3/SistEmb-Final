@@ -60,7 +60,7 @@
 #define PIN_SW2         PORTNUM2PIN(PC,6)
 #define PIN_SW3         PORTNUM2PIN(PA,4)
 
-//#define SW_PRESSED      LOW
+#define SW_PRESSED      LOW
 //#define SW_INPUT_TYPE   // ???
 
 #define PIN_PISR        PORTNUM2PIN(PE,24)

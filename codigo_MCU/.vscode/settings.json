@@ -63,6 +63,7 @@
     "magnetic_reader.h": "c",
     "encoder.h": "c",
     "board.h": "c",
-    "gpio.h": "c"
+    "gpio.h": "c",
+    "mk64f12.h": "c"
   }
 }
