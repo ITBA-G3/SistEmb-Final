@@ -20,7 +20,7 @@ Sacar señal de audio, metadata, etc.
 
 > to be determined (a determinar, en idioma español)
 
-- Driver para poder usar la matriz de leds.
+- Driver para poder usar la matriz de leds. (creo que va de la mano con el vumetro, la concha del pato)
 
 ### I2S & reproduccion de audio
 
