@@ -87,8 +87,8 @@ void vumeter_set_brightness(uint8_t brightness)
 
 static uint8_t setRow(float value)
 {
-    value = value * ((float)MATRIX_HEIGHT / VUMETER_MAX);
-    value = (uint8_t)(value + 0.5f);
+    value = value * ((float)MATRIX_HEIGHT / VUMETER_MAX) - 1; // scale to 0-7
+    value = (uint8_t)(value + 0.5f); // round to nearest integer
 
     if (value >= MATRIX_HEIGHT)
         value = MATRIX_HEIGHT - 1;
@@ -102,15 +102,18 @@ static uint8_t setColumn(uint16_t frequency)
     uint8_t high = VUMETER_FREQUENCIES - 1;
     uint8_t mid = (low + high) / 2;
 
+    // If frequency is less than or equal to the lowest band, return the first column
     if (frequency <= VUMETER_FREQUENCY_00)
     {
         return = 0;
     }
+    // If frequency is greater than or equal to the highest band, return the last column
     else if (frequency >= VUMETER_FREQUENCY_09)
     {
         return = VUMETER_FREQUENCIES - 1;
     }
-
+    
+    // If frequency is greater than or equal to the highest band, return the last column
     while (low <= high)
     {
         mid = (low + high) / 2;
