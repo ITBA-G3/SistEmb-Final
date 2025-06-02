@@ -88,6 +88,10 @@
 									<listOptionValue builtIn="false" value="../"/>
 									<listOptionValue builtIn="false" value="../SDK/CMSIS"/>
 									<listOptionValue builtIn="false" value="../SDK/startup"/>
+									<listOptionValue builtIn="false" value="/home/ivan/mcuxpresso/02/SDKPackages/com.nxp.mcuxpresso.sdk.sdk_2.x_frdm-k64f_p2site_2.11.0.20191125144615769813884580959144/devices/MK64F12"/>
+									<listOptionValue builtIn="false" value="/home/ivan/mcuxpresso/02/SDKPackages/com.nxp.mcuxpresso.sdk.sdk_2.x_frdm-k64f_p2site_2.11.0.20191125144615769813884580959144/devices/MK64F12/drivers"/>
+									<listOptionValue builtIn="false" value="/home/ivan/mcuxpresso/02/SDKPackages/com.nxp.mcuxpresso.sdk.sdk_2.x_frdm-k64f_p2site_2.11.0.20191125144615769813884580959144/boards"/>
+									<listOptionValue builtIn="false" value="/home/ivan/mcuxpresso/02/SDKPackages/com.nxp.mcuxpresso.sdk.sdk_2.x_frdm-k64f_p2site_2.11.0.20191125144615769813884580959144/components"/>
 								</option>
 								<option id="gnu.c.compiler.option.include.files.1307364996" name="Include files (-include)" superClass="gnu.c.compiler.option.include.files" useByScannerDiscovery="false"/>
 								<option id="com.crt.advproject.gcc.exe.debug.option.optimization.level.292857257" name="Optimization Level" superClass="com.crt.advproject.gcc.exe.debug.option.optimization.level" useByScannerDiscovery="false"/>
@@ -195,7 +199,7 @@
 								<option id="com.crt.advproject.link.arch.63074093" name="Architecture" superClass="com.crt.advproject.link.arch" useByScannerDiscovery="false" value="com.crt.advproject.link.target.cm4" valueType="enumerated"/>
 								<option id="gnu.c.link.option.nostart.1297283735" name="Do not use standard start files (-nostartfiles)" superClass="gnu.c.link.option.nostart" useByScannerDiscovery="false"/>
 								<option id="gnu.c.link.option.nodeflibs.981855255" name="Do not use default libraries (-nodefaultlibs)" superClass="gnu.c.link.option.nodeflibs" useByScannerDiscovery="false"/>
-								<option id="gnu.c.link.option.nostdlibs.1404412698" name="No startup or default libs (-nostdlib)" superClass="gnu.c.link.option.nostdlibs" useByScannerDiscovery="false" value="true" valueType="boolean"/>
+								<option id="gnu.c.link.option.nostdlibs.1404412698" name="No startup or default libs (-nostdlib)" superClass="gnu.c.link.option.nostdlibs" useByScannerDiscovery="false" value="false" valueType="boolean"/>
 								<option id="gnu.c.link.option.strip.1855006713" name="Omit all symbol information (-s)" superClass="gnu.c.link.option.strip" useByScannerDiscovery="false"/>
 								<option id="gnu.c.link.option.noshared.1873421436" name="No shared libraries (-static)" superClass="gnu.c.link.option.noshared" useByScannerDiscovery="false"/>
 								<option id="gnu.c.link.option.libs.121406635" name="Libraries (-l)" superClass="gnu.c.link.option.libs" useByScannerDiscovery="false"/>
@@ -235,7 +239,7 @@
 								<option id="com.crt.advproject.link.gcc.multicore.empty.282394409" name="No Multicore options for this project" superClass="com.crt.advproject.link.gcc.multicore.empty" useByScannerDiscovery="false"/>
 								<option id="com.crt.advproject.link.config.1656905990" name="Obsolete (Config)" superClass="com.crt.advproject.link.config" useByScannerDiscovery="false"/>
 								<option id="com.crt.advproject.link.store.1614877062" name="Obsolete (Store)" superClass="com.crt.advproject.link.store" useByScannerDiscovery="false"/>
-								<option id="com.crt.advproject.link.securestate.1002138862" superClass="com.crt.advproject.link.securestate"/>
+								<option id="com.crt.advproject.link.securestate.1002138862" name="TrustZone Project Type" superClass="com.crt.advproject.link.securestate"/>
 								<inputType id="cdt.managedbuild.tool.gnu.c.linker.input.1946605917" superClass="cdt.managedbuild.tool.gnu.c.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
