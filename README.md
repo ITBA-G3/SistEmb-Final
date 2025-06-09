@@ -8,6 +8,8 @@ Documentar todos los drivers $\to$ en caso de usar driver externos hacer un resu
 ### Lectura SD
 
 > Sulli
+#### Actualizaciones de funcionamiento.
+- La FRDM cuenta con un pin para detectar si hay una tarjeta puesta. Tiene un comportamiento errático, según el datasheet oficial NXP, se recomienda una R de pull-down externa porque la función pull-down interna de GPIO "es muy fuerte" y no permite transiciones. Lo que se observa es que sin pull-down el switch sólo pasa de bajo a alto una vez, y queda así hasta que reinicies el programa. Así que si sacás la SD, el programa va a seguir detectando que la tiene puesta.
 
 ### Decodificacion de archivo extraido de SD
 
