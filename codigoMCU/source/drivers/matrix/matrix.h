@@ -1,68 +1,66 @@
 /***************************************************************************/ /**
-   @file     vumeter.h
-   @brief    vumeter driver functions
+   @file     matrix.h
+   @brief    matrix driver functions
    @author   Grupo 3
   ******************************************************************************/
-
-#ifndef VUMETER_H
-#define VUMETER_H
+#ifndef MATRIX_H
+#define MATRIX_H
 
 /*******************************************************************************
  * INCLUDE HEADER FILES
  ******************************************************************************/
 #include <stdint.h>
 #include <stdbool.h>
-
 /*******************************************************************************
  * CONSTANT AND MACRO DEFINITIONS USING #DEFINE
  ******************************************************************************/
-
-#define VUMETER_MIN 0
-#define VUMETER_MAX 100
-#define VUMETER_FREQUENCIES 10
-
 #define MATRIX_HEIGHT 8
 #define MATRIX_WIDTH 8
 #define MATRIX_PIXELS (MATRIX_WIDTH * MATRIX_HEIGHT)
+#define DUT_ONE  40
+#define DUT_ZERO 20
+#define BITS_COLOR 8
+#define BITS_TOTAL BITS_COLOR*MATRIX_PIXELS*3
+
 /*******************************************************************************
  * ENUMERATIONS AND STRUCTURES AND TYPEDEFS
  ******************************************************************************/
-typedef enum
-{
-  VUMETER_FREQUENCY_00 = 20,
-  VUMETER_FREQUENCY_01 = 50,
-  VUMETER_FREQUENCY_02 = 100,
-  VUMETER_FREQUENCY_03 = 200,
-  VUMETER_FREQUENCY_04 = 400,
-  VUMETER_FREQUENCY_05 = 800,
-  VUMETER_FREQUENCY_06 = 1600,
-  VUMETER_FREQUENCY_07 = 3200,
-  VUMETER_FREQUENCY_08 = 6400,
-  VUMETER_FREQUENCY_09 = 12800,
-} vumeter_frequency_t;
+
+typedef struct {
+	uint16_t r[BITS_COLOR];
+	uint16_t g[BITS_COLOR];
+	uint16_t b[BITS_COLOR];
+} pixel_t;
 
 /*******************************************************************************
  * FUNCTION PROTOTYPES WITH GLOBAL SCOPE
  ******************************************************************************/
-
 /**
- * @brief Initialize the vumeter
- *
+ * @brief Initialize the matrix
  * @return true if initialization was successful, false otherwise
  */
-bool vumeter_init(void);
+bool matrix_init(void);
 
 /**
- * @brief Set the vumeter frequency
- *
- * @param frequency The frequency to set
- * @param value The value to set for the frequency (between VUMETER_MIN and VUMETER_MAX)
+ * @brief Converts an RGB value into a sequence of duty cycle bits for a specific LED.
+ * @param pixel The position of the pixel to set
+ * @param r The red component of the pixel color (0-255)
+ * @param g The green component of the pixel color (0-255)
+ * @param b The blue component of the pixel color (0-255)
  */
-void vumeter_set_frequency(vumeter_frequency_t frequency, uint16_t value);
+void matrix_set_pixel(uint16_t pixel, uint8_t r, uint8_t g, uint8_t b);
 
 /**
- * @brief clear the vumeter display, turn off all LEDs
- *
+ * @brief Clear the matrix. Sets all pixels to off (0, 0, 0).
  */
-void vumeter_clear(void);
+void matrix_clear(void);
 
+/**
+ * @brief Fill the matrix with a specific color.
+ * @param r The red component of the color (0-255)
+ * @param g The green component of the color (0-255)
+ * @param b The blue component of the color (0-255)
+ */
+void matrix_fill(uint8_t r, uint8_t g, uint8_t b);
+
+#endif // MATRIX_H
