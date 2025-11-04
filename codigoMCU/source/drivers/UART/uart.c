@@ -11,7 +11,7 @@
 #include "uart.h"
 #include "hardware.h"
 #include "MK64F12.h"
-#include "gpio.h"
+#include "../gpio.h"
 #include <stdarg.h>
 #include "cqueue.h"
 #include "cqueue_rx.h"
