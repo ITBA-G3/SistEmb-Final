@@ -7,7 +7,7 @@
 /*******************************************************************************
  * INCLUDE HEADER FILES
  ******************************************************************************/
-#include "drivers/FTM.h"
+#include "LEDmatrix.h"
 /*******************************************************************************
  * CONSTANT AND MACRO DEFINITIONS USING #DEFINE
  ******************************************************************************/
@@ -15,6 +15,17 @@
 /*******************************************************************************
  * FUNCTION PROTOTYPES FOR PRIVATE FUNCTIONS WITH FILE LEVEL SCOPE
  ******************************************************************************/
+
+
+static void delay_ms(uint32_t ms)
+{
+    volatile uint32_t i, j;
+    for (i = 0; i < ms; ++i) {
+        for (j = 0; j < 3000U; ++j) {
+            __asm("nop");
+        }
+    }
+}
 
 /*******************************************************************************
  *******************************************************************************
@@ -25,12 +36,31 @@
 /* Función que se llama 1 vez, al comienzo del programa */
 void App_Init(void)
 {
-    FTM_Init();
 }
 
 /* Función que se llama constantemente en un ciclo infinito */
 void App_Run(void)
 {
+    LEDM_t *dev = LEDM_Init(8, 8);
+    if (!dev) {
+        while (1);
+    }
+
+    LEDM_color_t red = { .r = 0xFF, .g = 0x00, .b = 0x00 };
+    LEDM_color_t green = { .r = 0x00, .g = 0xFF, .b = 0x00 };
+    LEDM_color_t blue = { .r = 0x00, .g = 0x00, .b = 0xFF };
+
+    LEDM_Clear(dev);
+
+    LEDM_SetPixel(dev, 2, 1, green);        // Prendo led de fila 1 comulna 2 verde en 3*64 array con formato GRB es el 4to elemento 
+
+    LEDM_SetBrightness(dev, 64);            // Seteo brillo a 25% (64/255) Entonces byte del color verde sera 0x40 (0x04) ????
+    LEDM_Show(dev);
+    LEDM_WaitTransferComplete(dev, 1000);
+
+    while (1) {
+    	LEDM_Show(dev);
+    }
 }
 
 /*******************************************************************************

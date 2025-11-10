@@ -6,6 +6,7 @@
 
 #include "FTM.h"
 #include "MK64F12.h"
+#include "gpio.h"
 
 #define PWM_CLK 800E3
 #define FTM_CLK 50E6
@@ -16,15 +17,9 @@ void FTM_Init(void)
 {
     // Enable FTM modules clock
 	SIM->SCGC6 |= SIM_SCGC6_FTM0_MASK;      // CLK 60MHz
-	// SIM->SCGC6 |= SIM_SCGC6_FTM1_MASK;
-	// SIM->SCGC6 |= SIM_SCGC6_FTM2_MASK;
-	// SIM->SCGC3 |= SIM_SCGC3_FTM3_MASK;
 
     // Enable FTM interrupts in NVIC
-	NVIC_EnableIRQ(FTM0_IRQn);
-	// NVIC_EnableIRQ(FTM1_IRQn);
-	// NVIC_EnableIRQ(FTM2_IRQn);
-	// NVIC_EnableIRQ(FTM3_IRQn);
+	// NVIC_EnableIRQ(FTM0_IRQn);		// OFF FOR FTM+bitbanging test
 
     // PTC 1 as PWM output
 	PORTC->PCR[1] = PORT_PCR_MUX(PORT_mAlt4) | PORT_PCR_DSE(true) | PORT_PCR_IRQC(PORT_eDisabled);
@@ -61,6 +56,7 @@ void FTM_SetMod(FTM_Type *base, uint16_t mod)
 
 uint16_t FTM_GetMod(FTM_Type *base)
 {
+	if (!(SIM->SCGC6 & SIM_SCGC6_FTM0_MASK)) return false;
 	return base->MOD;
 }
 

@@ -15,6 +15,13 @@ Documentar todos los drivers $\to$ en caso de usar driver externos hacer un resu
 
 Puedde ser que necesitemos una decodificacion previa.
 Sacar señal de audio, metadata, etc.
+Recursos: 
+- Wrapper para simplificar: https://github.com/Lefucjusz/Helix-MP3-Decoder
+- Helix a secas (igual al subido a campus por dani): https://github.com/liuduanfei/helix?tab=readme-ov-file
+- Appnote para entender helix: https://ww1.microchip.com/downloads/aemDocuments/documents/OTH/ApplicationNotes/ApplicationNotes/01367A.pdf
+- Referencia "Embedded Audio Processing": https://www.analog.com/media/en/dsp-documentation/embedded-media-processing/embedded-media-processing-chapter5.pdf
+
+
 
 ### Display 
 
