@@ -16,9 +16,8 @@
 void FTM_Init(void)
 {
     // Enable FTM modules clock
-	SIM->SCGC6 |= SIM_SCGC6_FTM0_MASK;      // CLK 60MHz
+	SIM->SCGC6 |= SIM_SCGC6_FTM0_MASK;
 
-    // Enable FTM interrupts in NVIC
 	// NVIC_EnableIRQ(FTM0_IRQn);		// OFF FOR FTM+bitbanging test
 
     // PTC 1 as PWM output
@@ -27,18 +26,23 @@ void FTM_Init(void)
     // Set default prescaler to 1
     FTM_SetPrescaler(FTM0, FTM_PSC_x1);     // Periodo = 1/60MHz * (MOD + 1) * Prescaler
 
-    FTM_SetInterruptMode(FTM0, FTM_CH_0, true);
+    FTM_SetInterruptMode(FTM0, FTM_CH_0, false);
     FTM_SetWorkingMode(FTM0, FTM_CH_0, FTM_mPulseWidthModulation);  
 
     FTM_SetPulseWidthModulationLogic(FTM0, FTM_CH_0, FTM_lAssertedHigh);
-
 
     // Set MOD value for 800kHz frequency
     FTM_SetMod(FTM0, FTM_MOD);
 
     FTM_SetCnV(FTM0, FTM_CH_0, CNV_0);
 
-    FTM_StartClock(FTM0);
+    // Enable DMA Request
+//    FTM_DMAMode(FTM0, FTM_CH_0, true);
+    FTM0->CONTROLS[0].CnSC |= FTM_CnSC_DMA_MASK;
+
+    // Ensure channel flag is enabled to generate events
+    FTM0->CONTROLS[0].CnSC |= FTM_CnSC_CHIE_MASK;  // optional but helps debugging
+//    FTM_StartClock(FTM0);
 }
 
 
@@ -110,6 +114,7 @@ void FTM_SetCnV(FTM_Type *base, FTMChannel_t channel, uint16_t value)
 {
 	base->CONTROLS[channel].CnV = FTM_CnV_VAL(value);
 }
+
 uint16_t FTM_GetCnV(FTM_Type *base, FTMChannel_t channel)
 {
 	return base->CONTROLS[channel].CnV;
@@ -134,8 +139,6 @@ void FTM_ClearInterruptFlag(FTM_Type *base, FTMChannel_t channel)
 	base->CONTROLS[channel].CnSC &= ~FTM_CnSC_CHF_MASK;
 }
 
-
-// SE USARÁ
 
 void FTM_DMAMode(FTM_Type *base, FTMChannel_t channel, bool enable)
 {
@@ -180,6 +183,7 @@ void FTM_SetOutputCompareEffect(FTM_Type *base, FTMChannel_t channel, FTMEffect_
 	base->CONTROLS[channel].CnSC = (base->CONTROLS[channel].CnSC & ~(FTM_CnSC_ELSB_MASK | FTM_CnSC_ELSA_MASK)) |
 								   (FTM_CnSC_ELSB((effect >> 1) & 0X01) | FTM_CnSC_ELSA((effect >> 0) & 0X01));
 }
+
 FTMEffect_t FTM_GetOutputCompareEffect(FTM_Type *base, FTMChannel_t channel)
 {
 	return (base->CONTROLS[channel].CnSC & (FTM_CnSC_ELSB_MASK | FTM_CnSC_ELSA_MASK)) >> FTM_CnSC_ELSA_SHIFT;

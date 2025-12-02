@@ -13,11 +13,11 @@ void DMA_Init(){
 
     // Limpiar todos los eventos pendientes
     NVIC_ClearPendingIRQ(DMA0_IRQn);  // Limpiar IRQ pendiente para DMA0
-    NVIC_ClearPendingIRQ(DMA1_IRQn);  // Limpiar IRQ pendiente para DMA1
+//    NVIC_ClearPendingIRQ(DMA1_IRQn);  // Limpiar IRQ pendiente para DMA1
 
     // Interrupciones DMA
     NVIC_EnableIRQ(DMA0_IRQn);  // Habilitar interrupción para DMA0
-    NVIC_EnableIRQ(DMA1_IRQn); // Habilitar interrupción para DMA1
+//    NVIC_EnableIRQ(DMA1_IRQn); // Habilitar interrupción para DMA1
 }
 
 void DMA_StartTransfer(DMAChannel_t channel){
@@ -34,6 +34,7 @@ void DMAMUX_ConfigChannel(DMAChannel_t channel, bool enable, bool trigger, dma_r
 void DMA_SetChannelInterrupt(DMAChannel_t channel, bool mode, callback_t interrupt_callback){
     callback[channel] = interrupt_callback;  //callback para la interrupción
     DMA0->TCD[channel].CSR = (DMA0->TCD[channel].CSR & ~DMA_CSR_INTMAJOR_MASK) + DMA_CSR_INTMAJOR(mode);  // habilita interrupción
+
 }
 
 
@@ -154,15 +155,25 @@ uint16_t DMA_GetStartMajorLoopCount(DMAChannel_t channel){
 	return DMA0->TCD[channel].BITER_ELINKNO & DMA_BITER_ELINKNO_BITER_MASK; //contador para el loop grande
 }
 
+void DMA_ClearChannelDoneFlag(DMAChannel_t channel) {
+    DMA0->CDNE = DMA_CDNE_CDNE(channel);
+}
+
+void DMA_ClearChannelIntFlag(DMAChannel_t channel) {
+    DMA0->CINT = DMA_CINT_CINT(channel);
+}
+
 void DMA0_IRQHandler(){
-	DMA0->CINT = 0;
+	DMA_ClearChannelIntFlag(DMA_CH0);
+	// DMA_SetEnableRequest(DMA_CH0, false); // REDUNDANTE PUES DREQ=1
 	if (callback[0] != 0){
 		callback[0]();
 	}
 }
 
 void DMA1_IRQHandler(){
-	DMA0->CINT = 1; 
+	DMA_ClearChannelIntFlag(DMA_CH1);
+	// DMA_SetEnableRequest(DMA_CH1, false); // REDUNDANTE PUES DREQ=1
 	if (callback[1] != 0){
 		callback[1]();
 	}

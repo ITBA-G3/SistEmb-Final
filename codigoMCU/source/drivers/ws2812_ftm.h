@@ -6,8 +6,9 @@
 
 bool WS2_TransportInit(void);
 void WS2_TransportDeinit(void);
-
-// Start send of raw GRB bytes buffer (length = num_pixels * 3).
 bool WS2_TransportSend(uint8_t *buf, uint32_t len);
+bool WS2_TransferInProgress(void);
+
+void refreshMatrix(void);
 
 #endif /* WS2812_TRANSPORT_H_ */

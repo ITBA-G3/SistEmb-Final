@@ -301,4 +301,18 @@ void DMA_SetStartMajorLoopCount(DMAChannel_t channel, uint16_t count);
  */
 uint16_t DMA_GetStartMajorLoopCount(DMAChannel_t channel);
 
+/**
+ * @brief Limpia la bandera DONE de un canal DMA
+ * 
+ * @param channel Canal DMA
+ */
+void DMA_ClearChannelDoneFlag(DMAChannel_t channel);
+
+/**
+ * @brief Limpia la bandera de interrupción de un canal DMA
+ * 
+ * @param channel Canal DMA
+ */
+void DMA_ClearChannelIntFlag(DMAChannel_t channel);
+
 #endif /* DMA_H_ */
