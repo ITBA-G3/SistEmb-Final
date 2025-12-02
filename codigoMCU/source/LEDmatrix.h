@@ -5,6 +5,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#define LEDM_MAX_WIDTH   8
+#define LEDM_MAX_HEIGHT  8
+#define LEDM_MAX_PIXELS  (LEDM_MAX_WIDTH * LEDM_MAX_HEIGHT)
 
 typedef struct {
 	uint8_t g;
@@ -25,7 +28,7 @@ LEDM_t* LEDM_Init(uint16_t width, uint16_t height);
 
 void LEDM_Deinit(LEDM_t* matrix);
 
-bool LEDM_SetPixel(LEDM_t* dev, uint8_t x, uint8_t y, LEDM_color_t color);
+bool LEDM_SetPixel(LEDM_t* dev, uint8_t y, uint8_t x, LEDM_color_t color);
 
 
 
@@ -33,7 +36,7 @@ void LEDM_SetBrightness(LEDM_t* dev, uint8_t brightness);
 
 bool LEDM_Show(LEDM_t* dev);
 
-bool LEDM_GetTransferProgress(LEDM_t* dev);
+bool LEDM_TransferInProgress();
 
 void LEDM_Clear(LEDM_t* matrix);
 

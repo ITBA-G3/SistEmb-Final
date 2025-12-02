@@ -51,23 +51,59 @@ void App_Run(void)
     LEDM_color_t green = { .r = 0x00, .g = 0xFF, .b = 0x00 };
     LEDM_color_t blue = { .r = 0x00, .g = 0x00, .b = 0xFF };
 
-//    LEDM_Clear(dev);
-    LEDM_SetBrightness(dev, 32);            // Seteo brillo a 25% (64/255) Entonces byte del color verde sera 0x40 (0x04) ????
 
-    LEDM_SetPixel(dev, 1, 1, green);        // Prendo led de fila 1 comulna 2 verde en 3*64 array con formato GRB es el 4to elemento
+    LEDM_SetBrightness(dev, 8);            // Seteo brillo a 25% (64/255) Entonces byte del color verde sera 0x40 (0x04) ????
 
-    LEDM_SetPixel(dev,1, 2,blue);
+    bool ok;
+    LEDM_color_t color;
 
-    LEDM_SetPixel(dev,2,3,red);
-    LEDM_SetPixel(dev,3,4,green);
-    LEDM_SetPixel(dev,4,5,blue);
-    LEDM_SetPixel(dev,5,6,red);
-    LEDM_SetPixel(dev,6,7,green);
+    for(int fila=0; fila<8; fila++){
+
+    	for(int i=0; i<8; i++){
+			LEDM_Clear(dev);
+			if(fila%3 == 0){
+				color = red;
+			}
+			if(fila%3 == 1){
+				color = green;
+			}
+			if(fila%3 == 2){
+				color = blue;
+			}
+			LEDM_SetPixel(dev, fila, i, color);
+			ok = LEDM_Show(dev);
+			if(ok){
+				while(LEDM_TransferInProgress())
+				{
+				}
+			}
+			delay_ms(1000);
+    	}
+    }
+//    for(int i=0; i<8; i++){
+//		LEDM_Clear(dev);
+//		LEDM_SetPixel(dev,2, i,blue);
+//		LEDM_Show(dev);
+//		while(LEDM_TransferInProgress())
+//		{
+//		}
+//		delay_ms(2000);
+//    }
+//    for(int i=0; i<8; i++){
+//		LEDM_Clear(dev);
+//		LEDM_SetPixel(dev,3, i, red);
+//		LEDM_Show(dev);
+//		while(LEDM_TransferInProgress())
+//		{
+//		}
+//		delay_ms(2000);
+//    }
+
+
 //    LEDM_SetPixel(dev,7,8,blue);
 //    LEDM_SetPixel(dev,8,7,red);
 
 
-	LEDM_Show(dev);
 
 //	for (int y = 1; y < 8; y++) {
 //		for (int x = 1; x < 8; x++){

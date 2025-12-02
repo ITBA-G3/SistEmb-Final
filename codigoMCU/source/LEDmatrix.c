@@ -7,35 +7,49 @@
 void apply_brightness_and_prepare(const LEDM_t* dev, uint8_t *out_buffer);
 uint16_t LEDM_GetPhysicalIndex(uint8_t x, uint8_t y);
 
+static LEDM_t g_matrix;
+static LEDM_color_t g_pixels[LEDM_MAX_PIXELS];
+
+
 LEDM_t* LEDM_Init(uint16_t width, uint16_t height){
 
-    LEDM_t* matrix;
+//    LEDM_t* matrix;
 
     if (width == 0 || height == 0) return NULL;
+    if (width > LEDM_MAX_WIDTH || height > LEDM_MAX_HEIGHT) return NULL;
 
-    matrix = (LEDM_t *)malloc(sizeof *matrix);
-    if (!matrix) return NULL;
+//    matrix = (LEDM_t *)malloc(sizeof *matrix);
+//    if (!matrix) return NULL;
+
+    LEDM_t *matrix = &g_matrix;
 
     matrix->width = width;
     matrix->height = height;
     matrix->num_pixels = (uint32_t)width * height;
 
     
-    matrix->pixels = (LEDM_color_t *)calloc(matrix->num_pixels, sizeof(LEDM_color_t));      // calloc para inicializar en cero
-    if (!matrix->pixels) {
-        free(matrix);
-        return NULL;
-    }
+//    matrix->pixels = (LEDM_color_t *)calloc(matrix->num_pixels, sizeof(LEDM_color_t));      // calloc para inicializar en cero
+//    if (!matrix->pixels) {
+//        free(matrix);
+//        return NULL;
+//    }
+
+    matrix->pixels = g_pixels;
+    memset(matrix->pixels, 0, sizeof(g_pixels));
+
 
     matrix->brightness = 64; // No me quiero quedar ciega.
     matrix->transfer_in_progress = false;
 
     /* Initialize transport FTM.
        If transport init fails, free resources and return NULL. */
+//    if (!WS2_TransportInit()) {
+//        free(matrix->pixels);
+//        free(matrix);
+//        return NULL;
+//    }
     if (!WS2_TransportInit()) {
-        free(matrix->pixels);
-        free(matrix);
-        return NULL;
+            return NULL;
     }
 
     return matrix;
@@ -49,35 +63,40 @@ void LEDM_Deinit(LEDM_t* matrix)
     free(matrix);
 }
 
-bool LEDM_SetPixel(LEDM_t* matrix, uint8_t x, uint8_t y, LEDM_color_t color){
+bool LEDM_SetPixel(LEDM_t* matrix, uint8_t y, uint8_t x, LEDM_color_t color){
 
     if (!matrix) return false;
 
-    if (x >= matrix->width || y >= matrix->height) return false;
+    if (x > matrix->width || y > matrix->height) return false;
+
+    static int hardcoded_to_fix_wierd_bug;
 
 
     uint16_t led_index = LEDM_GetPhysicalIndex(x,y);
 
     matrix->pixels[led_index] = color;
 
+//    if(hardcoded_to_fix_wierd_bug){
+//    	matrix->pixels[led_index--] = color;
+//    }
+//
+//    hardcoded_to_fix_wierd_bug = 1;
+
     return true;
 }
 
 
-//uint16_t LEDM_GetPhysicalIndex(uint8_t x, uint8_t y) {
-//	return (y-1) * 8 + (x-1);
-//}
-
 uint16_t LEDM_GetPhysicalIndex(uint8_t x, uint8_t y)
 {
-    return (y-1) * 8 + (x-1);
+    return (y) * 8 + (x);
 }
 
 
-bool LEDM_TransferInProgress(LEDM_t* matrix)
+bool LEDM_TransferInProgress()
 {
-    if (!matrix) return false;
-    return matrix->transfer_in_progress;
+//    if (!matrix) return false;
+//    return matrix->transfer_in_progress;
+	return (WS2_TransferInProgress());
 }
 
 bool LEDM_Show(LEDM_t* matrix)
@@ -86,7 +105,7 @@ bool LEDM_Show(LEDM_t* matrix)
     if (matrix->transfer_in_progress) return false;
     if (matrix->num_pixels > 64) return false;
 
-    static uint8_t tx[64 * 3];
+    uint8_t tx[64 * 3];
 
     for (uint32_t i = 0; i < matrix->num_pixels; i++) {
         LEDM_color_t c = matrix->pixels[i];
@@ -110,7 +129,9 @@ bool LEDM_Show(LEDM_t* matrix)
 
  void LEDM_Clear(LEDM_t* matrix){
 	 for(int i=0; i<matrix->num_pixels; i++){
-		 matrix->pixels = 0;
+		 matrix->pixels[i].g = 0;
+		 matrix->pixels[i].r = 0;
+		 matrix->pixels[i].b = 0;
 	 }
  }
 
