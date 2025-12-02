@@ -9,6 +9,7 @@
  ******************************************************************************/
 #include "LEDmatrix.h"
 #include "drivers/PIT.h"
+#include "Visualizer.h"
 /*******************************************************************************
  * CONSTANT AND MACRO DEFINITIONS USING #DEFINE
  ******************************************************************************/
@@ -42,7 +43,6 @@ static void PIT_cb(void){
  *******************************************************************************
  ******************************************************************************/
 
-/* Función que se llama 1 vez, al comienzo del programa */
 void App_Init(void)
 {
 	dev = LEDM_Init(8, 8);
@@ -50,7 +50,6 @@ void App_Init(void)
 	PIT_SetCallback(PIT_cb, PIT_1);
 }
 
-/* Función que se llama constantemente en un ciclo infinito */
 void App_Run(void)
 {
     if (!dev) {
@@ -62,36 +61,17 @@ void App_Run(void)
     LEDM_color_t blue = { .r = 0x00, .g = 0x00, .b = 0xFF };
 
 
-    LEDM_SetBrightness(dev, 8);            // Seteo brillo a 25% (64/255) Entonces byte del color verde sera 0x40 (0x04) ????
-
-    bool ok = 1;
-    LEDM_color_t color;
-
-    if(row%3 == 0) color = red;
-    if(row%3 == 1) color = blue;
-    if(row%3 == 2) color = green;
-
+    LEDM_SetBrightness(dev, 8);
 
     if(start_new_frame){
-
-    	LEDM_SetPixel(dev, row, column, color);
+    	start_new_frame = 0;
+    	Visualizer_UpdateFrame(dev);
 
     	ok = LEDM_Show(dev);
     	if(ok){
     		while(LEDM_TransferInProgress());
     	}
     	LEDM_Clear(dev);
-
-    	column++;
-
-    	if(column%8 == 0){
-    		row++;
-    		column=0;
-    	}
-    	if(row%8 == 0){
-    		row =0;
-    	}
-    	start_new_frame = 0;
     }
 }
 
