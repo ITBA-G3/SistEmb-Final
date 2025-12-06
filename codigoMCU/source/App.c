@@ -7,9 +7,7 @@
 /*******************************************************************************
  * INCLUDE HEADER FILES
  ******************************************************************************/
-#include "LEDmatrix.h"
-#include "drivers/PIT.h"
-#include "Visualizer.h"
+
 /*******************************************************************************
  * CONSTANT AND MACRO DEFINITIONS USING #DEFINE
  ******************************************************************************/
@@ -17,25 +15,6 @@
 /*******************************************************************************
  * FUNCTION PROTOTYPES FOR PRIVATE FUNCTIONS WITH FILE LEVEL SCOPE
  ******************************************************************************/
-static LEDM_t *dev;
-static bool start_new_frame;
-static uint8_t row = 0;
-static uint8_t column = 0;
-
-
-//static void delay_ms(uint32_t ms)
-//{
-//    volatile uint32_t i, j;
-//    for (i = 0; i < ms; ++i) {
-//        for (j = 0; j < 3000U; ++j) {
-//            __asm("nop");
-//        }
-//    }
-//}
-
-static void PIT_cb(void){
-	start_new_frame = true;
-}
 
 /*******************************************************************************
  *******************************************************************************
@@ -43,38 +22,17 @@ static void PIT_cb(void){
  *******************************************************************************
  ******************************************************************************/
 
+/* Función que se llama 1 vez, al comienzo del programa */
 void App_Init(void)
 {
-	dev = LEDM_Init(8, 8);
-	PIT_Init(PIT_1, 10);
-	PIT_SetCallback(PIT_cb, PIT_1);
+
 }
 
+/* Función que se llama constantemente en un ciclo infinito */
 void App_Run(void)
 {
-    if (!dev) {
-        while (1);
-    }
 
-    LEDM_color_t red = { .r = 0xFF, .g = 0x00, .b = 0x00 };
-    LEDM_color_t green = { .r = 0x00, .g = 0xFF, .b = 0x00 };
-    LEDM_color_t blue = { .r = 0x00, .g = 0x00, .b = 0xFF };
-
-
-    LEDM_SetBrightness(dev, 8);
-
-    if(start_new_frame){
-    	start_new_frame = 0;
-    	Visualizer_UpdateFrame(dev);
-
-    	ok = LEDM_Show(dev);
-    	if(ok){
-    		while(LEDM_TransferInProgress());
-    	}
-    	LEDM_Clear(dev);
-    }
 }
-
 
 /*******************************************************************************
  *******************************************************************************

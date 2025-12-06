@@ -4,9 +4,9 @@
   @author   Grupo 3
  ******************************************************************************/
 #include "encoder.h"
-#include "gpio.h"
-#include "pisr.h"
-#include "board.h"
+#include "drivers/gpio.h"
+#include "drivers/pisr.h"
+#include "source/board.h"
 #include "../SDK/CMSIS/MK64F12.h"
 
 #include <stdbool.h>
@@ -57,7 +57,7 @@ int16_t getTurns(void) {
 
 encoder_btn_event_t getSwitchState(void){
     encoder_btn_event_t event = btn_status;
-    btn_status = BTN_OPEN;
+    btn_status = BTN_NOT;
     return event;
 }
 
