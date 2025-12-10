@@ -18,7 +18,7 @@
  ******************************************************************************/
 // Button states for the encoder switch
 typedef enum {
-    BTN_NOT,           // Not pressed
+    BTN_NOT,            // Not pressed
     BTN_CLICK,          // Short press (normal click)
     BTN_LONG_CLICK      // Long press (hold)
 } encoder_btn_event_t;

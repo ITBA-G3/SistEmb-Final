@@ -34,9 +34,9 @@ static encoder_btn_event_t btn_status = BTN_NOT;
 static void Encoder_Periodic_ISR(void);
 
 void encoderInit(void) {
-    gpioMode(PIN_ENCODER_A, INPUT);
-    gpioMode(PIN_ENCODER_B, INPUT);
-    gpioMode(PIN_ENCODER_SWITCH, INPUT); 
+    gpioMode(PIN_ENCODER_A, INPUT_PULLUP);
+    gpioMode(PIN_ENCODER_B, INPUT_PULLUP);
+    gpioMode(PIN_ENCODER_SWITCH, INPUT_PULLUP);
 
     bool a = gpioRead(PIN_ENCODER_A);
     bool b = gpioRead(PIN_ENCODER_B);
@@ -62,8 +62,8 @@ encoder_btn_event_t getSwitchState(void){
 }
 
 static void Encoder_Periodic_ISR(void) {
-    bool a = gpioRead(PIN_ENCODER_A);
-    bool b = gpioRead(PIN_ENCODER_B);
+    bool a = !gpioRead(PIN_ENCODER_A);
+    bool b = !gpioRead(PIN_ENCODER_B);
     uint8_t currentState = (a << 1) + b;
 
     if(currentState != encoderLastState) {
@@ -88,7 +88,7 @@ static void Encoder_Periodic_ISR(void) {
         encoderLastState = currentState;
     }
 
-    if (gpioRead(PIN_ENCODER_SWITCH)) {
+    if (!gpioRead(PIN_ENCODER_SWITCH)) {
         if (btn_counter < 0xFFFF) btn_counter++;
     } else {
         if(btn_counter > 0) {
