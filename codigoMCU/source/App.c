@@ -29,9 +29,15 @@
 void App_Init(void)
 {
 	// SDHC driver initialization
-	__enable_irq();
+//	__enable_irq();
+}
+
+/*******************************************************************************
+ * App_Run - loop principal (vacío para este PoC)
+ ******************************************************************************/
+void App_Run(void)
+{
 	sdhc_enable_clocks_and_pins();
-//	NVIC_SetPendingIRQ(SDHC_IRQn);
 	sdhc_command_t command;
 	sdhc_data_t data;
 	bool success;
@@ -41,7 +47,7 @@ void App_Init(void)
 	sdhc_initialization_clocks();
 
 	// GO_IDLE_STATE: Send CMD0, to reset all MMC and SD cards.
-	success = false;
+	success = true;
 	command.index = 0;
 	command.argument = 0;
 	command.commandType = SDHC_COMMAND_TYPE_NORMAL;
@@ -67,14 +73,7 @@ void App_Init(void)
 			}
 		}
 	}
-}
-
-/*******************************************************************************
- * App_Run - loop principal (vacío para este PoC)
- ******************************************************************************/
-void App_Run(void)
-{
-    /* vacio */
+	while(true);
 }
 
 /*******************************************************************************

@@ -98,7 +98,7 @@ void sdhc_enable_clocks_and_pins(void)
 {
 	SYSMPU->CESR = 0; //disable memory protection unit
 	// Initialization of GPIO peripheral to detect switch
-	gpioMode(SDHC_SWITCH_PIN, INPUT_PULLDOWN);
+	gpioMode(SDHC_SWITCH_PIN, INPUT_PULLUP);
 	gpioIRQ(SDHC_SWITCH_PIN, GPIO_IRQ_MODE_BOTH_EDGES, SDHC_CardDetectedHandler);
     /* habilitar reloj al SDHC y al PORT E */
 	SIM->SCGC3 = (SIM->SCGC3 & ~SIM_SCGC3_SDHC_MASK)  | SIM_SCGC3_SDHC(1);
@@ -112,10 +112,15 @@ void sdhc_enable_clocks_and_pins(void)
 	PORTE->PCR[PIN2NUM(SDHC_D3_PIN)] = SDHC_D3_PCR;
 
     // Disable the automatically gating off of the peripheral's clock, hardware and other
-	SDHC->SYSCTL = (SDHC->SYSCTL & ~SDHC_SYSCTL_PEREN_MASK) | SDHC_SYSCTL_PEREN(1);
-	SDHC->SYSCTL = (SDHC->SYSCTL & ~SDHC_SYSCTL_HCKEN_MASK
-			) | SDHC_SYSCTL_HCKEN(1);
-	SDHC->SYSCTL = (SDHC->SYSCTL & ~SDHC_SYSCTL_IPGEN_MASK) | SDHC_SYSCTL_IPGEN(1);
+//	SDHC->SYSCTL = (SDHC->SYSCTL & ~SDHC_SYSCTL_PEREN_MASK) | SDHC_SYSCTL_PEREN(1);
+//	SDHC->SYSCTL = (SDHC->SYSCTL & ~SDHC_SYSCTL_HCKEN_MASK
+//			) | SDHC_SYSCTL_HCKEN(1);
+//	SDHC->SYSCTL = (SDHC->SYSCTL & ~SDHC_SYSCTL_IPGEN_MASK) | SDHC_SYSCTL_IPGEN(1);
+
+
+	/* Disable all clock auto gated off feature because of DAT0 line logic(card buffer full status) can't be updated
+	    correctly when clock auto gated off is enabled. */
+	SDHC->SYSCTL |= (SDHC_SYSCTL_PEREN_MASK | SDHC_SYSCTL_HCKEN_MASK | SDHC_SYSCTL_IPGEN_MASK);
 
 	// Disable the peripheral clocking, sets the divisor and prescaler for the new target frequency
 	// and configures the new value for the time-out delay. Finally, enables the clock again.
@@ -140,6 +145,12 @@ void sdhc_enable_clocks_and_pins(void)
 			SDHC_IRQSIGEN_CCEIEN_MASK 	| SDHC_IRQSIGEN_CEBEIEN_MASK 	| SDHC_IRQSIGEN_CIEIEN_MASK 	| SDHC_IRQSIGEN_DTOEIEN_MASK 	|
 			SDHC_IRQSIGEN_DCEIEN_MASK 	| SDHC_IRQSIGEN_DEBEIEN_MASK 	| SDHC_IRQSIGEN_AC12EIEN_MASK	| SDHC_IRQSIGEN_DMAEIEN_MASK
 	);
+	// Endianness + bus width = 1-bit fijo
+	SDHC->PROCTL &= ~(SDHC_PROCTL_EMODE_MASK | SDHC_PROCTL_DTW_MASK);
+	SDHC->PROCTL |=  SDHC_PROCTL_EMODE(2)     // 10b = little endian
+	               | SDHC_PROCTL_DTW(0);      // 00b = 1-bit bus
+	SDHC->PROCTL |= SDHC_PROCTL_CDSS_MASK | SDHC_PROCTL_CDTL_MASK;  // “card inserted” por soft
+	SDHC->PROCTL &= ~SDHC_PROCTL_D3CD_MASK;
 	NVIC_EnableIRQ(SDHC_IRQn);
 	status_init();
 }
@@ -175,6 +186,7 @@ void sdhc_reset(sdhc_reset_t reset_type)
 
 bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data)
 {
+
 	uint32_t	flags = 0;
 
 	if(sdhc_status.is_available)
@@ -266,7 +278,32 @@ bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data)
 			//todo: FALTA HACER LA PARTE DE DMA
 		}
 	}
-	SDHC->XFERTYP = flags;
+
+//	base->BLKATTR = ((base->BLKATTR & ~(SDHC_BLKATTR_BLKSIZE_MASK | SDHC_BLKATTR_BLKCNT_MASK)) |
+//	                     (SDHC_BLKATTR_BLKSIZE(config->dataBlockSize) | SDHC_BLKATTR_BLKCNT(config->dataBlockCount)));
+//	    base->CMDARG  = config->commandArgument;
+//	    base->XFERTYP = (((config->commandIndex << SDHC_XFERTYP_CMDINX_SHIFT) & SDHC_XFERTYP_CMDINX_MASK) |
+//	                     (config->flags & (SDHC_XFERTYP_DMAEN_MASK | SDHC_XFERTYP_MSBSEL_MASK | SDHC_XFERTYP_DPSEL_MASK |
+//	                                       SDHC_XFERTYP_CMDTYP_MASK | SDHC_XFERTYP_BCEN_MASK | SDHC_XFERTYP_CICEN_MASK |
+//	                                       SDHC_XFERTYP_CCCEN_MASK | SDHC_XFERTYP_RSPTYP_MASK | SDHC_XFERTYP_DTDSEL_MASK |
+//	                                       SDHC_XFERTYP_AC12EN_MASK)));
+
+	if(data)
+	{
+		SDHC->BLKATTR = ((SDHC->BLKATTR & ~(SDHC_BLKATTR_BLKSIZE_MASK | SDHC_BLKATTR_BLKCNT_MASK)) |
+				(SDHC_BLKATTR_BLKSIZE(data->blockSize) | SDHC_BLKATTR_BLKCNT(data->blockCount)));
+	}
+	else
+	{
+		SDHC->BLKATTR = ((SDHC->BLKATTR & ~(SDHC_BLKATTR_BLKSIZE_MASK | SDHC_BLKATTR_BLKCNT_MASK)) |
+						(SDHC_BLKATTR_BLKSIZE(0x00U) | SDHC_BLKATTR_BLKCNT(0x00U)));
+	}
+	SDHC->CMDARG = command->argument;
+	SDHC->XFERTYP = (((command->index << SDHC_XFERTYP_CMDINX_SHIFT) & SDHC_XFERTYP_CMDINX_MASK) |
+					 (flags & (SDHC_XFERTYP_DMAEN_MASK | SDHC_XFERTYP_MSBSEL_MASK | SDHC_XFERTYP_DPSEL_MASK |
+									   SDHC_XFERTYP_CMDTYP_MASK | SDHC_XFERTYP_BCEN_MASK | SDHC_XFERTYP_CICEN_MASK |
+									   SDHC_XFERTYP_CCCEN_MASK | SDHC_XFERTYP_RSPTYP_MASK | SDHC_XFERTYP_DTDSEL_MASK |
+									   SDHC_XFERTYP_AC12EN_MASK)));
 	return true;
 }
 
@@ -274,6 +311,9 @@ sdhc_error_t sdhc_transfer(sdhc_command_t* command, sdhc_data_t* data)
 {
 	sdhc_error_t error = SDHC_ERROR_OK;
 	bool forceExit = false;
+	SDHC->IRQSTAT = 0xFFFFFFFF; //intento de limpiar las flags
+    SDHC->PROCTL = ((SDHC->PROCTL & ~SDHC_PROCTL_DTW_MASK) | SDHC_PROCTL_DTW(0b00));
+
 
 	if (sdhc_start_transfer(command, data))
 	{
@@ -424,6 +464,7 @@ static void SDHC_TransferErrorHandler(uint32_t status)
 	}
 
 	sdhc_status.current_error = error;
+	SDHC->IRQSTAT = 0xFFFFFFFF;
 //	if (context.onTransferError)
 //	{
 //		context.onTransferError(error);
