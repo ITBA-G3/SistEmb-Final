@@ -183,129 +183,257 @@ void sdhc_reset(sdhc_reset_t reset_type)
 	}
 }
 
+// SULLI
+//bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data)
+//{
+//
+//	uint32_t	flags = 0;
+//
+//	if(sdhc_status.is_available)
+//	{
+//		if (!(SDHC->PRSSTAT & SDHC_PRSSTAT_CDIHB_MASK) && !(SDHC->PRSSTAT & SDHC_PRSSTAT_CIHB_MASK))
+//		{
+//			sdhc_status.is_available = false;
+//			sdhc_status.transfer_completed = false;
+//			sdhc_status.current_error = SDHC_ERROR_OK;
+//
+//			sdhc_status.current_command = command;
+//			sdhc_status.current_data    = data;
+//
+//			if(command)
+//			{
+//				switch (command->responseType)
+//				{
+//					case SDHC_RESPONSE_TYPE_NONE:
+//						flags |= SDHC_RESPONSE_LENGTH_NONE;
+//						break;
+//					case SDHC_RESPONSE_TYPE_R1:
+//						flags |= (SDHC_RESPONSE_LENGTH_48 | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
+//						break;
+//					case SDHC_RESPONSE_TYPE_R1b:
+//						flags |= (SDHC_RESPONSE_LENGTH_48BUSY | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
+//						break;
+//					case SDHC_RESPONSE_TYPE_R2:
+//						flags |= (SDHC_RESPONSE_LENGTH_136 | SDHC_COMMAND_CHECK_CCR);
+//						break;
+//					case SDHC_RESPONSE_TYPE_R3:
+//						flags |= (SDHC_RESPONSE_LENGTH_48);
+//						break;
+//					case SDHC_RESPONSE_TYPE_R4:
+//						flags |= (SDHC_RESPONSE_LENGTH_48);
+//						break;
+//					case SDHC_RESPONSE_TYPE_R5:
+//						flags |= (SDHC_RESPONSE_LENGTH_48 | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
+//						break;
+//					case SDHC_RESPONSE_TYPE_R5b:
+//						flags |= (SDHC_RESPONSE_LENGTH_48BUSY | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
+//						break;
+//					case SDHC_RESPONSE_TYPE_R6:
+//						flags |= (SDHC_RESPONSE_LENGTH_48 | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
+//						break;
+//					case SDHC_RESPONSE_TYPE_R7:
+//						flags |= (SDHC_RESPONSE_LENGTH_48 | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
+//						break;
+//					default:
+//						break;
+//				}
+//				// Set the command type, index and argument
+//				flags |= SDHC_XFERTYP_CMDINX(command->index);
+//				flags |= SDHC_XFERTYP_CMDTYP(command->commandType);
+//				SDHC->CMDARG = command->argument;
+//			}
+//
+//			if(data)
+//			{
+//				// WORD ALIGNMENT
+//				if (data->blockSize % sizeof(uint32_t) != 0U)
+//				{
+//					data->blockSize += sizeof(uint32_t) - (data->blockSize % sizeof(uint32_t));
+//				}
+//
+//				// Set block size and block count
+//				SDHC->BLKATTR = (SDHC->BLKATTR & ~(SDHC_BLKATTR_BLKSIZE_MASK | SDHC_BLKATTR_BLKCNT_MASK)) | SDHC_BLKATTR_BLKCNT(data->blockCount)  | SDHC_BLKATTR_BLKSIZE(data->blockSize);
+//
+//				// Sets the transferring mode selected by the user
+//				SDHC->IRQSTATEN = (SDHC->IRQSTATEN & ~SDHC_IRQSTATEN_BRRSEN_MASK) | SDHC_IRQSTATEN_BRRSEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b1 : 0b0);
+//				SDHC->IRQSTATEN = (SDHC->IRQSTATEN & ~SDHC_IRQSTATEN_BWRSEN_MASK) | SDHC_IRQSTATEN_BWRSEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b1 : 0b0);
+//				SDHC->IRQSTATEN = (SDHC->IRQSTATEN & ~SDHC_IRQSTATEN_DINTSEN_MASK) | SDHC_IRQSTATEN_DINTSEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b0 : 0b1);
+//				SDHC->IRQSIGEN = (SDHC->IRQSIGEN & ~SDHC_IRQSIGEN_BRRIEN_MASK) | SDHC_IRQSIGEN_BRRIEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b1 : 0b0);
+//				SDHC->IRQSIGEN = (SDHC->IRQSIGEN & ~SDHC_IRQSIGEN_BWRIEN_MASK) | SDHC_IRQSIGEN_BWRIEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b1 : 0b0);
+//				SDHC->IRQSIGEN = (SDHC->IRQSIGEN & ~SDHC_IRQSIGEN_DINTIEN_MASK) | SDHC_IRQSIGEN_DINTIEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b0 : 0b1);
+//				if (data->transferMode != SDHC_TRANSFER_MODE_CPU)
+//				{
+//					SDHC->PROCTL = (SDHC->PROCTL & ~SDHC_PROCTL_DMAS_MASK) | SDHC_PROCTL_DMAS(data->transferMode);
+//				}
+//
+//				// Set the data present flag
+//				flags |= SDHC_XFERTYP_DPSEL_MASK;
+//				flags |= SDHC_XFERTYP_DTDSEL(data->readBuffer ? 0b1 : 0b0);
+//				flags |= SDHC_XFERTYP_MSBSEL(data->blockCount > 1 ? 0b1 : 0b0);
+//				flags |= SDHC_XFERTYP_AC12EN(data->blockCount > 1 ? 0b1 : 0b0);
+//				flags |= SDHC_XFERTYP_BCEN(data->blockCount > 1 ? 0b1 : 0b0);
+//				flags |= SDHC_XFERTYP_DMAEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b0 : 0b1);
+//			}
+//
+//			//todo: FALTA HACER LA PARTE DE DMA
+//		}
+//	}
+//
+////	base->BLKATTR = ((base->BLKATTR & ~(SDHC_BLKATTR_BLKSIZE_MASK | SDHC_BLKATTR_BLKCNT_MASK)) |
+////	                     (SDHC_BLKATTR_BLKSIZE(config->dataBlockSize) | SDHC_BLKATTR_BLKCNT(config->dataBlockCount)));
+////	    base->CMDARG  = config->commandArgument;
+////	    base->XFERTYP = (((config->commandIndex << SDHC_XFERTYP_CMDINX_SHIFT) & SDHC_XFERTYP_CMDINX_MASK) |
+////	                     (config->flags & (SDHC_XFERTYP_DMAEN_MASK | SDHC_XFERTYP_MSBSEL_MASK | SDHC_XFERTYP_DPSEL_MASK |
+////	                                       SDHC_XFERTYP_CMDTYP_MASK | SDHC_XFERTYP_BCEN_MASK | SDHC_XFERTYP_CICEN_MASK |
+////	                                       SDHC_XFERTYP_CCCEN_MASK | SDHC_XFERTYP_RSPTYP_MASK | SDHC_XFERTYP_DTDSEL_MASK |
+////	                                       SDHC_XFERTYP_AC12EN_MASK)));
+//
+//	if(data)
+//	{
+//		SDHC->BLKATTR = ((SDHC->BLKATTR & ~(SDHC_BLKATTR_BLKSIZE_MASK | SDHC_BLKATTR_BLKCNT_MASK)) |
+//				(SDHC_BLKATTR_BLKSIZE(data->blockSize) | SDHC_BLKATTR_BLKCNT(data->blockCount)));
+//	}
+//	else
+//	{
+//		SDHC->BLKATTR = ((SDHC->BLKATTR & ~(SDHC_BLKATTR_BLKSIZE_MASK | SDHC_BLKATTR_BLKCNT_MASK)) |
+//						(SDHC_BLKATTR_BLKSIZE(0x00U) | SDHC_BLKATTR_BLKCNT(0x00U)));
+//	}
+//	SDHC->CMDARG = command->argument;
+//	SDHC->XFERTYP = (((command->index << SDHC_XFERTYP_CMDINX_SHIFT) & SDHC_XFERTYP_CMDINX_MASK) |
+//					 (flags & (SDHC_XFERTYP_DMAEN_MASK | SDHC_XFERTYP_MSBSEL_MASK | SDHC_XFERTYP_DPSEL_MASK |
+//									   SDHC_XFERTYP_CMDTYP_MASK | SDHC_XFERTYP_BCEN_MASK | SDHC_XFERTYP_CICEN_MASK |
+//									   SDHC_XFERTYP_CCCEN_MASK | SDHC_XFERTYP_RSPTYP_MASK | SDHC_XFERTYP_DTDSEL_MASK |
+//									   SDHC_XFERTYP_AC12EN_MASK)));
+//	return true;
+//}
 
+// CHAT
 bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data)
 {
+    uint32_t flags = 0;
 
-	uint32_t	flags = 0;
+    if (!sdhc_status.is_available) {
+        return false;
+    }
+    if (command == NULL) {
+        sdhc_status.current_error = SDHC_ERROR_DATA;
+        return false;
+    }
 
-	if(sdhc_status.is_available)
-	{
-		if (!(SDHC->PRSSTAT & SDHC_PRSSTAT_CDIHB_MASK) && !(SDHC->PRSSTAT & SDHC_PRSSTAT_CIHB_MASK))
-		{
-			sdhc_status.is_available = false;
-			sdhc_status.transfer_completed = false;
-			sdhc_status.current_error = SDHC_ERROR_OK;
+    /* Esperar a que el host no esté inhibido (RM: poll CIHB/CDIHB) */
+    uint32_t timeout = 0xFFFFFF;
+    while (timeout--) {
+        uint32_t prs = SDHC->PRSSTAT;
+        if (((prs & SDHC_PRSSTAT_CIHB_MASK) == 0) &&
+            ((prs & SDHC_PRSSTAT_CDIHB_MASK) == 0)) {
+            break;
+        }
+    }
+    if (timeout == 0) {
+        sdhc_status.current_error = SDHC_ERROR_CMD_TIMEOUT;
+        return false;
+    }
 
-			sdhc_status.current_command = command;
-			sdhc_status.current_data    = data;
+    /* A partir de acá es seguro programar y disparar */
+    sdhc_status.is_available = false;
+    sdhc_status.transfer_completed = false;
+    sdhc_status.current_error = SDHC_ERROR_OK;
+    sdhc_status.current_command = command;
+    sdhc_status.current_data    = data;
 
-			if(command)
-			{
-				switch (command->responseType)
-				{
-					case SDHC_RESPONSE_TYPE_NONE:
-						flags |= SDHC_RESPONSE_LENGTH_NONE;
-						break;
-					case SDHC_RESPONSE_TYPE_R1:
-						flags |= (SDHC_RESPONSE_LENGTH_48 | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
-						break;
-					case SDHC_RESPONSE_TYPE_R1b:
-						flags |= (SDHC_RESPONSE_LENGTH_48BUSY | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
-						break;
-					case SDHC_RESPONSE_TYPE_R2:
-						flags |= (SDHC_RESPONSE_LENGTH_136 | SDHC_COMMAND_CHECK_CCR);
-						break;
-					case SDHC_RESPONSE_TYPE_R3:
-						flags |= (SDHC_RESPONSE_LENGTH_48);
-						break;
-					case SDHC_RESPONSE_TYPE_R4:
-						flags |= (SDHC_RESPONSE_LENGTH_48);
-						break;
-					case SDHC_RESPONSE_TYPE_R5:
-						flags |= (SDHC_RESPONSE_LENGTH_48 | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
-						break;
-					case SDHC_RESPONSE_TYPE_R5b:
-						flags |= (SDHC_RESPONSE_LENGTH_48BUSY | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
-						break;
-					case SDHC_RESPONSE_TYPE_R6:
-						flags |= (SDHC_RESPONSE_LENGTH_48 | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
-						break;
-					case SDHC_RESPONSE_TYPE_R7:
-						flags |= (SDHC_RESPONSE_LENGTH_48 | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
-						break;
-					default:
-						break;
-				}
-				// Set the command type, index and argument
-				flags |= SDHC_XFERTYP_CMDINX(command->index);
-				flags |= SDHC_XFERTYP_CMDTYP(command->commandType);
-				SDHC->CMDARG = command->argument;
-			}
+    /* --- Response flags --- */
+    switch (command->responseType)
+    {
+        case SDHC_RESPONSE_TYPE_NONE:
+            flags |= SDHC_RESPONSE_LENGTH_NONE;
+            break;
+        case SDHC_RESPONSE_TYPE_R1:
+            flags |= (SDHC_RESPONSE_LENGTH_48 | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
+            break;
+        case SDHC_RESPONSE_TYPE_R1b:
+            flags |= (SDHC_RESPONSE_LENGTH_48BUSY | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
+            break;
+        case SDHC_RESPONSE_TYPE_R2:
+            flags |= (SDHC_RESPONSE_LENGTH_136 | SDHC_COMMAND_CHECK_CCR);
+            break;
+        case SDHC_RESPONSE_TYPE_R3:
+        case SDHC_RESPONSE_TYPE_R4:
+            flags |= (SDHC_RESPONSE_LENGTH_48);
+            break;
+        case SDHC_RESPONSE_TYPE_R5:
+        case SDHC_RESPONSE_TYPE_R6:
+        case SDHC_RESPONSE_TYPE_R7:
+            flags |= (SDHC_RESPONSE_LENGTH_48 | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
+            break;
+        case SDHC_RESPONSE_TYPE_R5b:
+            flags |= (SDHC_RESPONSE_LENGTH_48BUSY | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
+            break;
+        default:
+            break;
+    }
 
-			if(data)
-			{
-				// WORD ALIGNMENT
-				if (data->blockSize % sizeof(uint32_t) != 0U)
-				{
-					data->blockSize += sizeof(uint32_t) - (data->blockSize % sizeof(uint32_t));
-				}
+    /* Command index/type + argument */
+    flags |= SDHC_XFERTYP_CMDINX(command->index);
+    flags |= SDHC_XFERTYP_CMDTYP(command->commandType);
 
-				// Set block size and block count
-				SDHC->BLKATTR = (SDHC->BLKATTR & ~(SDHC_BLKATTR_BLKSIZE_MASK | SDHC_BLKATTR_BLKCNT_MASK)) | SDHC_BLKATTR_BLKCNT(data->blockCount)  | SDHC_BLKATTR_BLKSIZE(data->blockSize);
+    /* Data path setup (si corresponde) */
+    if (data)
+    {
+        /* No “alinear” el blockSize a palabra (esto cambia el tamaño real del bloque!)
+           Para SD, el bloque es 512 bytes. NO lo modifiques acá. */
 
-				// Sets the transferring mode selected by the user
-				SDHC->IRQSTATEN = (SDHC->IRQSTATEN & ~SDHC_IRQSTATEN_BRRSEN_MASK) | SDHC_IRQSTATEN_BRRSEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b1 : 0b0);
-				SDHC->IRQSTATEN = (SDHC->IRQSTATEN & ~SDHC_IRQSTATEN_BWRSEN_MASK) | SDHC_IRQSTATEN_BWRSEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b1 : 0b0);
-				SDHC->IRQSTATEN = (SDHC->IRQSTATEN & ~SDHC_IRQSTATEN_DINTSEN_MASK) | SDHC_IRQSTATEN_DINTSEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b0 : 0b1);
-				SDHC->IRQSIGEN = (SDHC->IRQSIGEN & ~SDHC_IRQSIGEN_BRRIEN_MASK) | SDHC_IRQSIGEN_BRRIEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b1 : 0b0);
-				SDHC->IRQSIGEN = (SDHC->IRQSIGEN & ~SDHC_IRQSIGEN_BWRIEN_MASK) | SDHC_IRQSIGEN_BWRIEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b1 : 0b0);
-				SDHC->IRQSIGEN = (SDHC->IRQSIGEN & ~SDHC_IRQSIGEN_DINTIEN_MASK) | SDHC_IRQSIGEN_DINTIEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b0 : 0b1);
-				if (data->transferMode != SDHC_TRANSFER_MODE_CPU)
-				{
-					SDHC->PROCTL = (SDHC->PROCTL & ~SDHC_PROCTL_DMAS_MASK) | SDHC_PROCTL_DMAS(data->transferMode);
-				}
+        SDHC->BLKATTR =
+            (SDHC->BLKATTR & ~(SDHC_BLKATTR_BLKSIZE_MASK | SDHC_BLKATTR_BLKCNT_MASK)) |
+            SDHC_BLKATTR_BLKCNT(data->blockCount) |
+            SDHC_BLKATTR_BLKSIZE(data->blockSize);
 
-				// Set the data present flag
-				flags |= SDHC_XFERTYP_DPSEL_MASK;
-				flags |= SDHC_XFERTYP_DTDSEL(data->readBuffer ? 0b1 : 0b0);
-				flags |= SDHC_XFERTYP_MSBSEL(data->blockCount > 1 ? 0b1 : 0b0);
-				flags |= SDHC_XFERTYP_AC12EN(data->blockCount > 1 ? 0b1 : 0b0);
-				flags |= SDHC_XFERTYP_BCEN(data->blockCount > 1 ? 0b1 : 0b0);
-				flags |= SDHC_XFERTYP_DMAEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b0 : 0b1);
-			}
+        SDHC->IRQSTATEN = (SDHC->IRQSTATEN & ~SDHC_IRQSTATEN_BRRSEN_MASK) |
+                          SDHC_IRQSTATEN_BRRSEN(data->transferMode == SDHC_TRANSFER_MODE_CPU);
+        SDHC->IRQSTATEN = (SDHC->IRQSTATEN & ~SDHC_IRQSTATEN_BWRSEN_MASK) |
+                          SDHC_IRQSTATEN_BWRSEN(data->transferMode == SDHC_TRANSFER_MODE_CPU);
+        SDHC->IRQSTATEN = (SDHC->IRQSTATEN & ~SDHC_IRQSTATEN_DINTSEN_MASK) |
+                          SDHC_IRQSTATEN_DINTSEN(data->transferMode != SDHC_TRANSFER_MODE_CPU);
 
-			//todo: FALTA HACER LA PARTE DE DMA
-		}
-	}
+        SDHC->IRQSIGEN  = (SDHC->IRQSIGEN  & ~SDHC_IRQSIGEN_BRRIEN_MASK) |
+                          SDHC_IRQSIGEN_BRRIEN(data->transferMode == SDHC_TRANSFER_MODE_CPU);
+        SDHC->IRQSIGEN  = (SDHC->IRQSIGEN  & ~SDHC_IRQSIGEN_BWRIEN_MASK) |
+                          SDHC_IRQSIGEN_BWRIEN(data->transferMode == SDHC_TRANSFER_MODE_CPU);
+        SDHC->IRQSIGEN  = (SDHC->IRQSIGEN  & ~SDHC_IRQSIGEN_DINTIEN_MASK) |
+                          SDHC_IRQSIGEN_DINTIEN(data->transferMode != SDHC_TRANSFER_MODE_CPU);
 
-//	base->BLKATTR = ((base->BLKATTR & ~(SDHC_BLKATTR_BLKSIZE_MASK | SDHC_BLKATTR_BLKCNT_MASK)) |
-//	                     (SDHC_BLKATTR_BLKSIZE(config->dataBlockSize) | SDHC_BLKATTR_BLKCNT(config->dataBlockCount)));
-//	    base->CMDARG  = config->commandArgument;
-//	    base->XFERTYP = (((config->commandIndex << SDHC_XFERTYP_CMDINX_SHIFT) & SDHC_XFERTYP_CMDINX_MASK) |
-//	                     (config->flags & (SDHC_XFERTYP_DMAEN_MASK | SDHC_XFERTYP_MSBSEL_MASK | SDHC_XFERTYP_DPSEL_MASK |
-//	                                       SDHC_XFERTYP_CMDTYP_MASK | SDHC_XFERTYP_BCEN_MASK | SDHC_XFERTYP_CICEN_MASK |
-//	                                       SDHC_XFERTYP_CCCEN_MASK | SDHC_XFERTYP_RSPTYP_MASK | SDHC_XFERTYP_DTDSEL_MASK |
-//	                                       SDHC_XFERTYP_AC12EN_MASK)));
+        if (data->transferMode != SDHC_TRANSFER_MODE_CPU) {
+            SDHC->PROCTL = (SDHC->PROCTL & ~SDHC_PROCTL_DMAS_MASK) | SDHC_PROCTL_DMAS(data->transferMode);
+        }
 
-	if(data)
-	{
-		SDHC->BLKATTR = ((SDHC->BLKATTR & ~(SDHC_BLKATTR_BLKSIZE_MASK | SDHC_BLKATTR_BLKCNT_MASK)) |
-				(SDHC_BLKATTR_BLKSIZE(data->blockSize) | SDHC_BLKATTR_BLKCNT(data->blockCount)));
-	}
-	else
-	{
-		SDHC->BLKATTR = ((SDHC->BLKATTR & ~(SDHC_BLKATTR_BLKSIZE_MASK | SDHC_BLKATTR_BLKCNT_MASK)) |
-						(SDHC_BLKATTR_BLKSIZE(0x00U) | SDHC_BLKATTR_BLKCNT(0x00U)));
-	}
-	SDHC->CMDARG = command->argument;
-	SDHC->XFERTYP = (((command->index << SDHC_XFERTYP_CMDINX_SHIFT) & SDHC_XFERTYP_CMDINX_MASK) |
-					 (flags & (SDHC_XFERTYP_DMAEN_MASK | SDHC_XFERTYP_MSBSEL_MASK | SDHC_XFERTYP_DPSEL_MASK |
-									   SDHC_XFERTYP_CMDTYP_MASK | SDHC_XFERTYP_BCEN_MASK | SDHC_XFERTYP_CICEN_MASK |
-									   SDHC_XFERTYP_CCCEN_MASK | SDHC_XFERTYP_RSPTYP_MASK | SDHC_XFERTYP_DTDSEL_MASK |
-									   SDHC_XFERTYP_AC12EN_MASK)));
-	return true;
+        flags |= SDHC_XFERTYP_DPSEL_MASK;
+        flags |= SDHC_XFERTYP_DTDSEL(data->readBuffer ? 1u : 0u);
+        flags |= SDHC_XFERTYP_MSBSEL(data->blockCount > 1 ? 1u : 0u);
+        flags |= SDHC_XFERTYP_AC12EN(data->blockCount > 1 ? 1u : 0u);
+        flags |= SDHC_XFERTYP_BCEN  (data->blockCount > 1 ? 1u : 0u);
+        flags |= SDHC_XFERTYP_DMAEN(data->transferMode != SDHC_TRANSFER_MODE_CPU);
+    }
+    else
+    {
+        SDHC->BLKATTR =
+            (SDHC->BLKATTR & ~(SDHC_BLKATTR_BLKSIZE_MASK | SDHC_BLKATTR_BLKCNT_MASK));
+    }
+
+    /* Limpio status antes de disparar (recomendado) */
+    SDHC->IRQSTAT = 0xFFFFFFFF;
+
+    /* Ahora sí disparo */
+    SDHC->CMDARG = command->argument;
+    SDHC->XFERTYP =
+        (((command->index << SDHC_XFERTYP_CMDINX_SHIFT) & SDHC_XFERTYP_CMDINX_MASK) |
+         (flags & (SDHC_XFERTYP_DMAEN_MASK | SDHC_XFERTYP_MSBSEL_MASK | SDHC_XFERTYP_DPSEL_MASK |
+                   SDHC_XFERTYP_CMDTYP_MASK | SDHC_XFERTYP_BCEN_MASK  | SDHC_XFERTYP_CICEN_MASK |
+                   SDHC_XFERTYP_CCCEN_MASK | SDHC_XFERTYP_RSPTYP_MASK | SDHC_XFERTYP_DTDSEL_MASK |
+                   SDHC_XFERTYP_AC12EN_MASK)));
+
+    return true;
 }
+
+
 
 sdhc_error_t sdhc_transfer(sdhc_command_t* command, sdhc_data_t* data)
 {

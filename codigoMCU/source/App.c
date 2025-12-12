@@ -12,6 +12,7 @@
 #include "gpio.h"
 #include "board.h"
 #include "drivers/SDHC/sdhc.h"
+#include "sdhc_init_test.h"
 /*******************************************************************************
  * CONSTANT AND MACRO DEFINITIONS
  ******************************************************************************/
@@ -29,7 +30,7 @@
 void App_Init(void)
 {
 	// SDHC driver initialization
-//	__enable_irq();
+	__enable_irq();
 }
 
 /*******************************************************************************
@@ -38,41 +39,20 @@ void App_Init(void)
 void App_Run(void)
 {
 	sdhc_enable_clocks_and_pins();
-	sdhc_command_t command;
-	sdhc_data_t data;
-	bool success;
+//	sdhc_command_t command;
+//	sdhc_data_t data;
+//	bool success;
 
 	// Send 80 clocks to the card, to initialize internal operations
 	sdhc_reset(SDHC_RESET_CMD);
+	sdhc_reset(SDHC_RESET_DATA);
 	sdhc_initialization_clocks();
 
-	// GO_IDLE_STATE: Send CMD0, to reset all MMC and SD cards.
-	success = true;
-	command.index = 0;
-	command.argument = 0;
-	command.commandType = SDHC_COMMAND_TYPE_NORMAL;
-	command.responseType = SDHC_RESPONSE_TYPE_NONE;
-	if (sdhc_transfer(&command, NULL) == SDHC_ERROR_OK)
-	{
-		success = true;
-	}
+    sd_card_t card = {0};
+    sdhc_error_t e = sd_card_init_full(&card);
+    if(e == SDHC_ERROR_OK){}
 
-	// SEND_IF_COND: Send CMD8, asks the SD card if works with the given voltage range.
-	if (success)
-	{
-		success = false;
-		command.index = 8;
-		command.argument = 0x100 | 0xAA;
-		command.commandType = SDHC_COMMAND_TYPE_NORMAL;
-		command.responseType = SDHC_RESPONSE_TYPE_R7;
-		if (sdhc_transfer(&command, NULL) == SDHC_ERROR_OK)
-		{
-			if ((command.response[0] & 0xFF) == 0xAA)
-			{
-				success = true;
-			}
-		}
-	}
+    // ver e, card.rca, card.sdhc, card.ocr
 	while(true);
 }
 
