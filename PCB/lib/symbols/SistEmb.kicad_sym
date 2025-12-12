@@ -27,7 +27,7 @@
 				(justify left bottom)
 			)
 		)
-		(property "Footprint" "FRDM-K64F:FRDM-K64F"
+		(property "Footprint" "SistEmb:FRDM-K64F"
 			(at 0 0 0)
 			(effects
 				(font

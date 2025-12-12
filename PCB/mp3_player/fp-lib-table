@@ -1,4 +1,0 @@
-(fp_lib_table
-  (version 7)
-  (lib (name "SistEmb")(type "KiCad")(uri "/home/ezequiel/ITBA/Grado/2024-2Q/Sistemas_Embebidos/Trabajos Practicos/SistEmb-Final/PCB/lib/footprints/SistEmb.pretty")(options "")(descr ""))
-)
