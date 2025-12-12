@@ -39,9 +39,6 @@ void App_Init(void)
 void App_Run(void)
 {
 	sdhc_enable_clocks_and_pins();
-//	sdhc_command_t command;
-//	sdhc_data_t data;
-//	bool success;
 
 	// Send 80 clocks to the card, to initialize internal operations
 	sdhc_reset(SDHC_RESET_CMD);
@@ -50,7 +47,19 @@ void App_Run(void)
 
     sd_card_t card = {0};
     sdhc_error_t e = sd_card_init_full(&card);
-    if(e == SDHC_ERROR_OK){}
+    sdhc_error_t e2;
+
+    if(e == SDHC_ERROR_OK){		//
+//    	sdhcSetClock(100000);  // 100 kHz
+
+    	uint8_t sector0[512] __attribute__((aligned(4)));
+//
+//    	static uint32_t read_buf[512/4] __attribute__((aligned(4)));
+
+
+    	e2 = sd_read_single_block_adma2(0, read_buf);
+		if(e2==SDHC_ERROR_DMA){}
+    }
 
     // ver e, card.rca, card.sdhc, card.ocr
 	while(true);

@@ -13,6 +13,7 @@
 #include "drivers/SDHC/sdhc.h"
 
 
+
 static inline sdhc_error_t sd_send_cmd(uint8_t idx, uint32_t arg,
                                       sdhc_response_type_t respType,
                                       sdhc_command_t *out_cmd)
@@ -149,8 +150,7 @@ sdhc_error_t sd_card_init_full(sd_card_t *card)
 
     card->rca = (uint16_t)((cmd3.response[0] >> 16) & 0xFFFFu);
     if (card->rca == 0) {
-//        return SDHC_ERROR_RESPONSE;		// ????? no se que error devovler pero con fe y esperanza nunca entra a este if
-    	return SDHC_RESPONSE_TYPE_R6;
+    	return SDHC_ERROR_DATA;		// BAD RCA
     }
 
     // 6) CMD7: SELECT_CARD (R1b idealmente, pero muchos drivers usan R1 y luego esperan busy)
@@ -165,5 +165,27 @@ sdhc_error_t sd_card_init_full(sd_card_t *card)
     }
 
     return SDHC_ERROR_OK;
+}
+
+
+sdhc_error_t sd_read_single_block_adma2(uint32_t block, uint8_t *buf512)
+{
+    if (!buf512) return SDHC_ERROR_DATA;
+
+    sdhc_command_t cmd = {0};
+    sdhc_data_t data = {0};
+
+    data.blockCount   = 1;
+    data.blockSize    = 512;
+    data.readBuffer   = (uint32_t*)buf512;
+    data.writeBuffer  = NULL;
+    data.transferMode = SDHC_TRANSFER_MODE_ADMA2;
+
+    cmd.index = 17;                         // CMD17
+    cmd.argument     = block;                      // SDHC: block addressing
+    cmd.commandType  = SDHC_COMMAND_TYPE_NORMAL;
+    cmd.responseType = SDHC_RESPONSE_TYPE_R1;
+
+    return sdhc_transfer(&cmd, &data);
 }
 

@@ -73,6 +73,22 @@ typedef struct {
 	sdhc_command_t*	current_command;
 
 } sd_status_t;
+
+
+
+/* ===== ADMA2 (solo visible dentro de sdhc.c) ===== */
+typedef struct {
+    uint32_t attr_len;
+    uint32_t addr;
+} sdhc_adma2_desc_t;
+
+#define ADMA2_VALID     (1u << 0)
+#define ADMA2_END       (1u << 1)
+#define ADMA2_ACT_TRAN  (2u << 4)   /* Act = 10b (transfer) */
+
+/* 1 descriptor para 1 bloque (512B). Alineación típica requerida por SDHC ADMA2 */
+static sdhc_adma2_desc_t adma2_desc __attribute__((aligned(32)));
+
 ///*******************************************************************************
 // * STATIC VARIABLES AND CONST VARIABLES WITH FILE LEVEL SCOPE
 // ******************************************************************************/
@@ -93,6 +109,32 @@ static sd_status_t sdhc_status = {0};
 //                        GLOBAL FUNCTION DEFINITIONS
 // *******************************************************************************
 // ******************************************************************************/
+
+static bool sdhc_prepare_adma2(const sdhc_data_t *data)
+{
+    if (!data) return false;
+    if (data->transferMode != SDHC_TRANSFER_MODE_ADMA2) return true;
+
+    uint32_t bytes = data->blockCount * data->blockSize;
+    if (bytes == 0u || bytes > 65535u) return false;
+
+    void *buf = data->readBuffer ? (void*)data->readBuffer : (void*)data->writeBuffer;
+    if (!buf) return false;
+    if (((uintptr_t)buf & 0x3u) != 0u) return false;  // alineación 4B
+
+    adma2_desc.attr_len =
+        ((bytes & 0xFFFFu) << 16) |
+        ADMA2_ACT_TRAN |
+        ADMA2_END |
+        ADMA2_VALID;
+
+    adma2_desc.addr = (uint32_t)(uintptr_t)buf;
+
+    SDHC->ADSADDR = (uint32_t)(uintptr_t)&adma2_desc;
+    return true;
+}
+
+
 
 void sdhc_enable_clocks_and_pins(void)
 {
@@ -182,6 +224,7 @@ void sdhc_reset(sdhc_reset_t reset_type)
 		SDHC->IRQSIGEN = SDHC->IRQSTATEN;
 	}
 }
+
 
 // SULLI
 //bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data)
@@ -307,6 +350,7 @@ void sdhc_reset(sdhc_reset_t reset_type)
 //	return true;
 //}
 
+
 // CHAT
 bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data)
 {
@@ -418,6 +462,18 @@ bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data)
             (SDHC->BLKATTR & ~(SDHC_BLKATTR_BLKSIZE_MASK | SDHC_BLKATTR_BLKCNT_MASK));
     }
 
+
+    // ADMA
+    if (data && data->transferMode == SDHC_TRANSFER_MODE_ADMA2) {
+        if (!sdhc_prepare_adma2(data)) {
+            sdhc_status.current_error = SDHC_ERROR_DMA;
+            sdhc_status.is_available = true;
+            return false;
+        }
+    }
+
+
+
     /* Limpio status antes de disparar (recomendado) */
     SDHC->IRQSTAT = 0xFFFFFFFF;
 
@@ -429,6 +485,9 @@ bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data)
                    SDHC_XFERTYP_CMDTYP_MASK | SDHC_XFERTYP_BCEN_MASK  | SDHC_XFERTYP_CICEN_MASK |
                    SDHC_XFERTYP_CCCEN_MASK | SDHC_XFERTYP_RSPTYP_MASK | SDHC_XFERTYP_DTDSEL_MASK |
                    SDHC_XFERTYP_AC12EN_MASK)));
+
+    // LA PARTE DE DMA
+
 
     return true;
 }
@@ -445,6 +504,7 @@ sdhc_error_t sdhc_transfer(sdhc_command_t* command, sdhc_data_t* data)
 
 	if (sdhc_start_transfer(command, data))
 	{
+
 		while (!forceExit && !sdhc_status.transfer_completed)
 		{
 			if (sdhc_status.current_error != SDHC_ERROR_OK)

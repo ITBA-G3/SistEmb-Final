@@ -28,6 +28,7 @@ typedef struct {
 #define SD_CMD_SET_BLOCKLEN         16  // CMD16 (solo relevante en SDSC normalmente)
 
 
-sdhc_error_t sd_card_init_full(sd_card_t *card);
 
+sdhc_error_t sd_card_init_full(sd_card_t *card);
+sdhc_error_t sd_read_single_block_adma2(uint32_t block, uint8_t *buf512);
 #endif /* SDHC_INIT_TEST_H_ */
