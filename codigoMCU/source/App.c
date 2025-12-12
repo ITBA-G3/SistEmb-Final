@@ -8,6 +8,11 @@
  * INCLUDE HEADER FILES
  ******************************************************************************/
 
+#include <stdint.h>
+#include "gpio.h"
+#include "board.h"
+#include "drivers/LCD/LCD.h"
+
 /*******************************************************************************
  * CONSTANT AND MACRO DEFINITIONS USING #DEFINE
  ******************************************************************************/
@@ -25,13 +30,35 @@
 /* Función que se llama 1 vez, al comienzo del programa */
 void App_Init(void)
 {
+    SysTick_Init();
 
+    init_LCD();
+	gpioMode(PIN_LED_BLUE, OUTPUT);
 }
 
 /* Función que se llama constantemente en un ciclo infinito */
 void App_Run(void)
-{
+{ 
+    for (int i=0; i<10000000; i++)
+        ;
+    char* str = "Labura Cristian #MITRAck <3";
+    write_LCD(str,0);
+    shift_LCD(0);
 
+    for (int i=0; i<10000000; i++)
+        ;
+    char* str1 = "hola mundo";
+    write_LCD(str1,0);
+    shift_LCD(0);
+    
+    while (1)
+    {
+        for (int i=0; i<10000000; i++)
+        {
+            ;
+        }
+	    gpioToggle(PIN_LED_BLUE);
+    }
 }
 
 /*******************************************************************************
