@@ -83,45 +83,50 @@ void write_LCD(char* str, uint8_t line)
             write_byte(LCD.text[line][i], 0, 1);
 
     return_home();
-    delay_ms(3);
+    delay_ms(50);
 }
 
 void shift_LCD(uint8_t line)
 {
-    set_cursor_line(line);
+    if (line>1 || line<0)
+        return;
+
     if (LCD.size_text[line] < DISPLAY_WIDTH)
     {
+        set_cursor_line(line);
         for (int i=0; i<LCD.size_text[line]; i++)
             write_byte(LCD.text[line][i], 0, 1);
         return;
     }
 
-    for (int i=0; i<(LCD.size_text[line]+DISPLAY_WIDTH); i++)
+    for (int i=0; i<=(LCD.size_text[line]); i++)
     {
         set_cursor_line(line);
-        if (i<LCD.size_text[line])
-            // Print a line on screen
-            // for (int j=0; j<LCD.size_text[line]; j++)
-            for (int j=0; j<DISPLAY_WIDTH; j++)
-            {
-                if (i+j < LCD.size_text[line])
-                    write_byte(LCD.text[line][j+i], 0, 1); 
-                else
-                    write_byte(' ', 0, 1);   // Empty space
-            }
-        else
+        // Print a line on screen
+        for (int j=0; j<DISPLAY_WIDTH; j++)
         {
-            for (int j=0; j<(LCD.size_text[line]+DISPLAY_WIDTH)-i; j++)
+            if (i+j < LCD.size_text[line])
+                write_byte(LCD.text[line][j+i], 0, 1); 
+            else
                 write_byte(' ', 0, 1);   // Empty space
-            for (int j=0; j<i-LCD.size_text[line]; j++)
-                write_byte(LCD.text[line][j], 0, 1);
-        }   
-
-        delay_ms(370);
+        }
+        delay_ms(600);
         clear_line(line);
     }
-    write_LCD(LCD.text[line], line);
-    return_home();
+
+    for (int i=0; i<DISPLAY_WIDTH; i++)
+    {
+        set_cursor_line(line);
+        for (int j=0; j<DISPLAY_WIDTH; j++)
+        {
+            if (j < DISPLAY_WIDTH - i - 1 )
+                write_byte(' ', 0, 1);
+            else 
+                write_byte(LCD.text[line][j - DISPLAY_WIDTH + i + 1], 0, 1);
+        }
+        delay_ms(600);
+        clear_line(line);
+    }
 }
 
 
@@ -191,7 +196,7 @@ void clear_line(uint8_t line)
     set_cursor_line(line);
     for(int i=0; i<DISPLAY_WIDTH; i++)
         write_byte(' ', 0, 1);
-    return_home();
+    set_cursor_line(line);
 }
 
 static void delay_ms(uint32_t ms)

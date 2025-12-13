@@ -33,31 +33,26 @@ void App_Init(void)
     SysTick_Init();
 
     init_LCD();
-	gpioMode(PIN_LED_BLUE, OUTPUT);
+    gpioMode(PIN_LED_BLUE, OUTPUT);
 }
 
 /* Función que se llama constantemente en un ciclo infinito */
 void App_Run(void)
 { 
-    for (int i=0; i<10000000; i++)
-        ;
-    char* str = "Labura Cristian #MITRAck <3";
+    char* str = "TP Final - Sistemas Embebidos";
+    char* str1 = "Reproductor MP3";
+
     write_LCD(str,0);
     shift_LCD(0);
+    write_LCD(str1,1);
 
-    for (int i=0; i<10000000; i++)
-        ;
-    char* str1 = "hola mundo";
-    write_LCD(str1,0);
-    shift_LCD(0);
-    
     while (1)
     {
         for (int i=0; i<10000000; i++)
         {
             ;
         }
-	    gpioToggle(PIN_LED_BLUE);
+         gpioToggle(PIN_LED_BLUE);
     }
 }
 
