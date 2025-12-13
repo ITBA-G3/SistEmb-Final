@@ -49,21 +49,44 @@ void App_Run(void)
     sdhc_error_t e = sd_card_init_full(&card);
     sdhc_error_t e2;
 
+	uint8_t sector0[512] __attribute__((aligned(4)));
+	static uint32_t sector_w[512/4] __attribute__((aligned(4)));
+	static uint32_t tx_block[512/4] __attribute__((aligned(4)));
     if(e == SDHC_ERROR_OK){		//
 //    	sdhcSetClock(100000);  // 100 kHz
 
-    	uint8_t sector0[512] __attribute__((aligned(4)));
-//
+
 //    	static uint32_t read_buf[512/4] __attribute__((aligned(4)));
 
+    	uint32_t lba = 0;          // por ejemplo, sector 0
+		bool is_sdhc = false;       // lo determinás en tu init (ACMD41 -> CCS)
 
-    	e2 = sd_read_single_block_adma2(0, read_buf);
+		for(uint8_t i = 0; i < 512/4; i++)
+		{
+			tx_block[i] = i;
+		}
+		sdhc_error_t err = sdhc_write_block_cpu(lba, is_sdhc, tx_block);
+		if (err != SDHC_ERROR_OK) {
+			while (1) {}
+		}
+
+		err = sdhc_read_block_cpu(lba, is_sdhc, sector_w);
+
+		if (err != SDHC_ERROR_OK)
+		{
+			/* Acá poné breakpoint y mirá sdhc_status.current_error y SDHC->IRQSTAT */
+			while (1) {}
+		}
+
+//    	e2 = sd_read_single_block_adma2(35, sector0);
 		if(e2==SDHC_ERROR_DMA){}
     }
 
     // ver e, card.rca, card.sdhc, card.ocr
 	while(true);
 }
+
+
 
 /*******************************************************************************
  * LOCAL FUNCTION DEFINITIONS

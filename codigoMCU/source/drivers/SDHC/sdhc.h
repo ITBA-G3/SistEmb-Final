@@ -88,5 +88,7 @@ int sdhc_read_single_block_polling(uint32_t block_addr, uint8_t *out);
 bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data);
 void sdhc_initialization_clocks(void);
 sdhc_error_t sdhc_transfer(sdhc_command_t* command, sdhc_data_t* data);
+sdhc_error_t sdhc_read_block_cpu(uint32_t lba, bool card_is_sdhc, uint32_t *buf512_w);
+sdhc_error_t sdhc_write_block_cpu(uint32_t lba, bool card_is_sdhc, const uint32_t *buf512_w);
 
 #endif //SDHC_H
