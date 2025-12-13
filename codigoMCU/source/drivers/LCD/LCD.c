@@ -8,9 +8,6 @@
 
 static void delay_ms(uint32_t ms);
 
-static uint8_t cursor_v = 0;
-static uint8_t cursor_h = 0;
-
 typedef struct {
     char* text[2];
     uint8_t size_text[2];
@@ -23,31 +20,40 @@ void init_LCD (void)
     init_I2C();
 
     delay_ms(40);
+
+    uint8_t payload = (uint8_t)(1<<3);
+    write_I2C(PCF8574T_SLAVE_ADDR, &payload, 1);
+
+    delay_ms(5);
     // Dummy bytes
     write_nibble(0b0011, 0, 0);
     delay_ms(5);
     write_nibble(0b0011, 0, 0);
-    delay_ms(1);
+    delay_ms(3);
     write_nibble(0b0011, 0, 0);
-    delay_ms(1);
+    delay_ms(3);
     // set interface to 4-bit
     write_nibble(0b0010, 0, 0);
-    delay_ms(1);
+    delay_ms(3);
     // specify display lines & char font
     write_byte(0b00101000, 0, 0);
-    delay_ms(1);
+    delay_ms(3);
     // display off
     write_byte(0b00001000, 0, 0);
-    delay_ms(1);
+    delay_ms(3);
     // display clear
     write_byte(0b00000001, 0, 0);
-    delay_ms(2);
+    delay_ms(6);
     // Entry mode set
     write_byte(0b00000110, 0, 0);
-    delay_ms(1);
+    delay_ms(3);
     // display on
     write_byte(0b00001100, 0, 0);
-    delay_ms(1);
+    delay_ms(3);
+
+    // return_home();
+    clear_LCD();
+    delay_ms(3);  
 }
 
 /**
@@ -67,22 +73,22 @@ void write_LCD(char* str, uint8_t line)
     while(str[size] != '\0' && size <= 255)
         size++;
 
-    clear_LCD();
-    for (int i=0; i<size; i++)
-    {
-        if(i<DISPLAY_WIDTH)
-            write_byte(str[i], 0, 1);
-    }
-    return_home();
-    
     LCD.text[line] = str;
     LCD.size_text[line] = size;
+    clear_line(line);
+
+    set_cursor_line(line);
+    for (int i=0; i<LCD.size_text[line]; i++)
+        if(i<DISPLAY_WIDTH)
+            write_byte(LCD.text[line][i], 0, 1);
+
+    return_home();
+    delay_ms(3);
 }
 
 void shift_LCD(uint8_t line)
 {
-    // TODO: select line to shift
-    
+    set_cursor_line(line);
     if (LCD.size_text[line] < DISPLAY_WIDTH)
     {
         for (int i=0; i<LCD.size_text[line]; i++)
@@ -92,16 +98,17 @@ void shift_LCD(uint8_t line)
 
     for (int i=0; i<(LCD.size_text[line]+DISPLAY_WIDTH); i++)
     {
+        set_cursor_line(line);
         if (i<LCD.size_text[line])
             // Print a line on screen
-            for (int j=0; j<LCD.size_text[line]; j++)
+            // for (int j=0; j<LCD.size_text[line]; j++)
+            for (int j=0; j<DISPLAY_WIDTH; j++)
             {
                 if (i+j < LCD.size_text[line])
                     write_byte(LCD.text[line][j+i], 0, 1); 
                 else
                     write_byte(' ', 0, 1);   // Empty space
             }
-        // TODO: hacer que vuelva a entrar por la derecha el texto
         else
         {
             for (int j=0; j<(LCD.size_text[line]+DISPLAY_WIDTH)-i; j++)
@@ -110,12 +117,13 @@ void shift_LCD(uint8_t line)
                 write_byte(LCD.text[line][j], 0, 1);
         }   
 
-        return_home();
-        delay_ms(300);
-        clear_LCD();
+        delay_ms(370);
+        clear_line(line);
     }
     write_LCD(LCD.text[line], line);
+    return_home();
 }
+
 
 /************************
  *   Internal functions
@@ -129,19 +137,14 @@ void return_home()
     write_byte(data_byte, 0, 0);
 }
 
-void set_cursor(uint8_t line, uint8_t column)
+void set_cursor_line(uint8_t line)
 {
-    static uint8_t data_byte = 0;
-    cursor_h = line;
-    cursor_v = column;
+    uint8_t data_byte = 0b10000000;
 
-    // Return home
-    data_byte = 0b00000010;
+    if (line != 0)
+        data_byte |= 0x40;
+
     write_byte(data_byte, 0, 0);
-
-    data_byte = 0b00010100;   // move cursor right
-    for (int i=0; i<column+16*line; i++)
-        write_byte(data_byte, 0, 0);
 }
 
 void write_byte(uint8_t data, uint8_t RW, uint8_t RS)
@@ -181,6 +184,14 @@ void clear_LCD()
     write_byte(data, 0, 0);
 
     delay_ms(4);    
+}
+
+void clear_line(uint8_t line)
+{
+    set_cursor_line(line);
+    for(int i=0; i<DISPLAY_WIDTH; i++)
+        write_byte(' ', 0, 1);
+    return_home();
 }
 
 static void delay_ms(uint32_t ms)

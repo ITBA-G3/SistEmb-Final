@@ -43,13 +43,15 @@ void shift_LCD(uint8_t line);
 
 void clear_LCD();
 
+void clear_line(uint8_t line);
+
 /************************
  *   Internal functions
  ***********************/
 
 void return_home(void);
 
-void set_cursor(uint8_t line, uint8_t column);
+void set_cursor_line(uint8_t line);
 
 void write_char();
 
