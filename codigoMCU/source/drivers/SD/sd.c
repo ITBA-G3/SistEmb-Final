@@ -163,7 +163,7 @@ sd_error_t sd_init(sd_card_t *card)
         if (e != SDHC_ERROR_OK) return sd_map_sdhc_err(e);
     }
 
-    sdhc_set_clock(2500000u);
+    sdhc_set_clock(25000000u);
 
     card->initialized = true;
 
