@@ -4,14 +4,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define SD_BLOCK_SIZE 512
+
 // SDHC internal parameters
 #define SDHC_MAXIMUM_BLOCK_SIZE		4096
 #define SDHC_RESET_TIMEOUT			100000
 #define SDHC_CLOCK_FREQUENCY		(96000000U)
-
-#define SD_4bit_mode
-#define SD_1bit_mode
 
 typedef enum {
 	SDHC_TRANSFER_MODE_CPU,		// Data transfer will be executed by the CPU host
@@ -83,12 +80,10 @@ typedef struct {
 void sdhc_enable_clocks_and_pins(void);
 void sdhc_reset(sdhc_reset_t reset_type);
 void sdhc_soft_reset_all(void);
-int sdhc_write_single_block_polling(uint32_t block_addr, const uint8_t *data);
-int sdhc_read_single_block_polling(uint32_t block_addr, uint8_t *out);
 bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data);
 void sdhc_initialization_clocks(void);
 sdhc_error_t sdhc_transfer(sdhc_command_t* command, sdhc_data_t* data);
-sdhc_error_t sdhc_read_block_cpu(uint32_t lba, bool card_is_sdhc, uint32_t *buf512_w);
-sdhc_error_t sdhc_write_block_cpu(uint32_t lba, bool card_is_sdhc, const uint32_t *buf512_w);
+void sdhc_set_clock(uint32_t hz);
+
 
 #endif //SDHC_H

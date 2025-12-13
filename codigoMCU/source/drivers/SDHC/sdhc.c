@@ -9,10 +9,10 @@
 // ******************************************************************************/
 #include "hardware.h"
 #include "MK64F12.h"
+#include "board.h"
+#include "gpio.h"
 
 #include "sdhc.h"
-#include "gpio.h"
-#include "board.h"
 ///*******************************************************************************
 // * CONSTANT AND MACRO DEFINITIONS USING #DEFINE
 // ******************************************************************************/
@@ -56,11 +56,12 @@
 #define SDHC_CARD_DETECTED_FLAGS		(SDHC_IRQSTAT_CINS_MASK | SDHC_IRQSTAT_CRM_MASK)
 #define SDHC_DATA_FLAG					(SDHC_IRQSTAT_BRR_MASK | SDHC_IRQSTAT_BWR_MASK)
 #define SDHC_DATA_TIMEOUT_FLAG			(SDHC_IRQSTAT_DTOE_MASK)
-#define SDHC_ERROR_FLAG					(																										 \
-											SDHC_IRQSTAT_DMAE_MASK | SDHC_IRQSTAT_AC12E_MASK | SDHC_IRQSTAT_DEBE_MASK |  SDHC_IRQSTAT_DCE_MASK | \
-											SDHC_IRQSTAT_CIE_MASK | SDHC_IRQSTAT_CEBE_MASK | SDHC_IRQSTAT_CCE_MASK |    \
-											SDHC_IRQSTAT_CTOE_MASK														 \
-										)
+#define SDHC_ERROR_FLAG ( \
+    SDHC_IRQSTAT_DMAE_MASK  | SDHC_IRQSTAT_AC12E_MASK | SDHC_IRQSTAT_DEBE_MASK | SDHC_IRQSTAT_DCE_MASK | \
+    SDHC_IRQSTAT_DTOE_MASK  | \
+    SDHC_IRQSTAT_CIE_MASK   | SDHC_IRQSTAT_CEBE_MASK  | SDHC_IRQSTAT_CCE_MASK  | SDHC_IRQSTAT_CTOE_MASK \
+)
+
 
 ///*******************************************************************************
 // * ENUMERATIONS AND STRUCTURES AND TYPEDEFS
@@ -121,7 +122,7 @@ static uint32_t computeFrequency(uint8_t prescaler, uint8_t divisor);
 static void SDHC_TransferErrorHandler(uint32_t status);
 static void status_init(void);
 
-static sd_status_t sdhc_status = {0};
+static volatile sd_status_t sdhc_status = {0};
 ///*******************************************************************************
 // *******************************************************************************
 //                        GLOBAL FUNCTION DEFINITIONS
@@ -490,11 +491,11 @@ bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data)
                 return false;
             }
 
-            /* Watermark: para 512B conviene 128 words, así BRR/BWR salta 1 vez por bloque */
-            if (cpu_xfer.is_read) {
-                SDHC->WML = (SDHC->WML & ~SDHC_WML_RDWML_MASK) | SDHC_WML_RDWML(128);
+            if (!cpu_xfer.is_read) {
+                /* 32 words = 128 bytes por interrupción */
+            	SDHC->WML = (SDHC->WML & ~SDHC_WML_RDWML_MASK) | SDHC_WML_RDWML(32);
             } else {
-                SDHC->WML = (SDHC->WML & ~SDHC_WML_WRWML_MASK) | SDHC_WML_WRWML(128);
+            	SDHC->WML = (SDHC->WML & ~SDHC_WML_RDWML_MASK) | SDHC_WML_RDWML(32);
             }
         }
         else
@@ -519,7 +520,10 @@ bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data)
         }
     }
 
-
+    if(command->index == 17 || command->index == 18)
+    {
+    	SDHC->IRQSIGEN |= SDHC_IRQSIGEN_TCIEN_MASK;
+    }
 
     /* Limpio status antes de disparar (recomendado) */
     SDHC->IRQSTAT = 0xFFFFFFFF;
@@ -578,6 +582,13 @@ void sdhc_initialization_clocks(void)
 		timeout--;
 	}
 }
+
+
+void sdhc_set_clock(uint32_t hz)
+{
+    sdhcSetClock(hz);
+}
+
 ///*******************************************************************************
 // *******************************************************************************
 //                        LOCAL FUNCTION DEFINITIONS
@@ -778,7 +789,7 @@ static void SDHC_DataHandler(uint32_t status)
     if ((status & SDHC_IRQSTAT_BRR_MASK) && cpu_xfer.is_read)
     {
         /* Cuánto leer en esta IRQ: en general watermark words, pero no pasar el total */
-        uint32_t chunk = 128u;
+        uint32_t chunk = 32u;
         if (cpu_xfer.remaining_words < chunk) chunk = cpu_xfer.remaining_words;
 
         for (uint32_t i = 0; i < chunk; i++) {
@@ -794,7 +805,6 @@ static void SDHC_DataHandler(uint32_t status)
     /* WRITE path: Buffer Write Ready */
     if ((status & SDHC_IRQSTAT_BWR_MASK) && !cpu_xfer.is_read)
 	{
-		/* Tomar WRWML actual (words) */
 		uint32_t wml = (SDHC->WML & SDHC_WML_WRWML_MASK) >> SDHC_WML_WRWML_SHIFT;
 		uint32_t chunk = (wml == 0u) ? 1u : wml;
 
@@ -813,55 +823,6 @@ static void SDHC_DataHandler(uint32_t status)
     if (cpu_xfer.remaining_words == 0u) {
         cpu_xfer.active = false;
     }
-}
-
-//////////////////// PRUEBA
-
-sdhc_error_t sdhc_read_block_cpu(uint32_t lba, bool card_is_sdhc, uint32_t *buf512_w)
-{
-    if (!buf512_w) return SDHC_ERROR_DATA;
-    if (((uintptr_t)buf512_w & 0x3u) != 0u) return SDHC_ERROR_DATA;
-
-    sdhc_command_t cmd = {0};
-    sdhc_data_t data   = {0};
-
-    cmd.index        = 17;
-    cmd.commandType  = 0;
-    cmd.responseType = SDHC_RESPONSE_TYPE_R1;
-    cmd.argument     = card_is_sdhc ? lba : (lba * 512u);
-
-    data.blockSize     = 512u;
-    data.blockCount    = 1u;
-    data.readBuffer    = buf512_w;     // ahora matchea el tipo
-    data.writeBuffer   = NULL;
-    data.transferMode  = SDHC_TRANSFER_MODE_CPU;
-
-    return sdhc_transfer(&cmd, &data);
-}
-
-sdhc_error_t sdhc_write_block_cpu(uint32_t lba, bool card_is_sdhc, const uint32_t *buf512_w)
-{
-    if (!buf512_w) return SDHC_ERROR_DATA;
-    if (((uintptr_t)buf512_w & 0x3u) != 0u) return SDHC_ERROR_DATA;
-
-    SDHC->IRQSIGEN = SDHC->IRQSIGEN | SDHC_IRQSIGEN_TCIEN_MASK;
-
-    sdhc_command_t cmd = {0};
-    sdhc_data_t data   = {0};
-
-    cmd.index        = 24;                      // CMD24 = WRITE_SINGLE_BLOCK
-    cmd.commandType  = 0;                       // normal
-    cmd.responseType = SDHC_RESPONSE_TYPE_R1;   // R1
-
-    cmd.argument = card_is_sdhc ? lba : (lba * SD_BLOCK_SIZE);
-
-    data.blockSize     = SD_BLOCK_SIZE;
-    data.blockCount    = 1u;
-    data.readBuffer    = NULL;
-    data.writeBuffer   = (uint32_t*)buf512_w;   // tu struct probablemente no es const
-    data.transferMode  = SDHC_TRANSFER_MODE_CPU;
-
-    return sdhc_transfer(&cmd, &data);
 }
 
 

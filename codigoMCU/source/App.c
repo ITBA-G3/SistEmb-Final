@@ -13,6 +13,11 @@
 #include "board.h"
 #include "drivers/SDHC/sdhc.h"
 #include "sdhc_init_test.h"
+#include "drivers/FAT/ff.h"
+
+
+
+#include "drivers/FAT/diskio.h"
 /*******************************************************************************
  * CONSTANT AND MACRO DEFINITIONS
  ******************************************************************************/
@@ -27,9 +32,14 @@
  * GLOBAL DATA
  ******************************************************************************/
 
+static FATFS fs;
+
 void App_Init(void)
 {
 	// SDHC driver initialization
+	sdhc_enable_clocks_and_pins();
+	sdhc_reset(SDHC_RESET_CMD);
+	sdhc_reset(SDHC_RESET_DATA);
 	__enable_irq();
 }
 
@@ -38,52 +48,88 @@ void App_Init(void)
  ******************************************************************************/
 void App_Run(void)
 {
-	sdhc_enable_clocks_and_pins();
 
-	// Send 80 clocks to the card, to initialize internal operations
-	sdhc_reset(SDHC_RESET_CMD);
-	sdhc_reset(SDHC_RESET_DATA);
-	sdhc_initialization_clocks();
-
-    sd_card_t card = {0};
-    sdhc_error_t e = sd_card_init_full(&card);
-    sdhc_error_t e2;
-
-	uint8_t sector0[512] __attribute__((aligned(4)));
-	static uint32_t sector_w[512/4] __attribute__((aligned(4)));
-	static uint32_t tx_block[512/4] __attribute__((aligned(4)));
-    if(e == SDHC_ERROR_OK){		//
-//    	sdhcSetClock(100000);  // 100 kHz
+//	static BYTE s0[512];
+//
+//	DSTATUS st = disk_initialize(0);      // o 1 si tu SD está en pdrv=1
+//	DRESULT dr = disk_read(0, s0, 0, 1);
+//
+//	if (st & STA_NOINIT) while(1) {}
+//	if (dr != RES_OK) while(1) {}
 
 
-//    	static uint32_t read_buf[512/4] __attribute__((aligned(4)));
+    FRESULT fr;
+    FIL fil;
+    UINT bw, br;
+    char readbuf[64];
+    char buffer[128];
 
-    	uint32_t lba = 0;          // por ejemplo, sector 0
-		bool is_sdhc = false;       // lo determinás en tu init (ACMD41 -> CCS)
-
-		for(uint8_t i = 0; i < 512/4; i++)
-		{
-			tx_block[i] = i;
-		}
-		sdhc_error_t err = sdhc_write_block_cpu(lba, is_sdhc, tx_block);
-		if (err != SDHC_ERROR_OK) {
-			while (1) {}
-		}
-
-		err = sdhc_read_block_cpu(lba, is_sdhc, sector_w);
-
-		if (err != SDHC_ERROR_OK)
-		{
-			/* Acá poné breakpoint y mirá sdhc_status.current_error y SDHC->IRQSTAT */
-			while (1) {}
-		}
-
-//    	e2 = sd_read_single_block_adma2(35, sector0);
-		if(e2==SDHC_ERROR_DMA){}
+    fr = f_mount(&fs, "0:", 1);      // SD en pdrv=1 según tu diskio.c
+    if (fr != FR_OK) {
+        while (1) {}                 // breakpoint: fr
     }
 
-    // ver e, card.rca, card.sdhc, card.ocr
-	while(true);
+//    fr = f_open(&fil, "0:/test.txt", FA_CREATE_ALWAYS | FA_WRITE);
+//    if (fr != FR_OK)
+//    {
+//    	while (1) {}
+//    }
+    fr = f_open(&fil, "0:/hola.txt", FA_READ);
+	if (fr != FR_OK)
+	{
+		while (1) {}
+	}
+//
+//    const char *msg = "hola FATFS\r\n";
+//    fr = f_write(&fil, msg, strlen(msg), &bw);
+//    if (fr != FR_OK || bw != strlen(msg))
+//    {
+//    	while (1) {}
+//    }
+
+	/* Leer contenido */
+	do {
+		fr = f_read(&fil, buffer, sizeof(buffer) - 1, &br);
+		if (fr != FR_OK) {
+			while (1) {}
+		}
+
+		buffer[br] = '\0';   // para tratarlo como string
+		/* acá usás buffer:
+		   - imprimir por UART
+		   - parsear
+		   - copiar a otro lado
+		*/
+
+	} while (br > 0);   // EOF cuando br == 0
+
+    fr = f_close(&fil);
+    if (fr != FR_OK)
+    {
+    	while (1) {}
+    }
+
+    memset(readbuf, 0, sizeof(readbuf));
+    fr = f_open(&fil, "0:/test.txt", FA_READ);
+    if (fr != FR_OK)
+    {
+    	while (1) {}
+    }
+
+    fr = f_read(&fil, readbuf, sizeof(readbuf)-1, &br);
+    if (fr != FR_OK)
+    {
+    	while (1) {}
+    }
+
+    fr = f_close(&fil);
+    if (fr != FR_OK)
+    {
+    	while (1) {}
+    }
+
+    /* Si llegaste acá, FATFS funciona. `readbuf` debería contener "hola FATFS\r\n" */
+    while (1) {}
 }
 
 
