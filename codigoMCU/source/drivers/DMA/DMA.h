@@ -44,6 +44,8 @@ typedef enum{
   DMA_CH15,
 } DMAChannel_t;
 
+//typedef DMA_Type *DMA_t;
+
 typedef void (*callback_t)(void);
 
 

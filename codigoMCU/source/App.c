@@ -10,6 +10,8 @@
 #include "LEDmatrix.h"
 #include "drivers/PIT.h"
 #include "Visualizer.h"
+#include "Audio.h"
+
 /*******************************************************************************
  * CONSTANT AND MACRO DEFINITIONS USING #DEFINE
  ******************************************************************************/
@@ -19,19 +21,7 @@
  ******************************************************************************/
 static LEDM_t *dev;
 static bool start_new_frame;
-static uint8_t row = 0;
-static uint8_t column = 0;
 
-
-//static void delay_ms(uint32_t ms)
-//{
-//    volatile uint32_t i, j;
-//    for (i = 0; i < ms; ++i) {
-//        for (j = 0; j < 3000U; ++j) {
-//            __asm("nop");
-//        }
-//    }
-//}
 
 static void PIT_cb(void){
 	start_new_frame = true;
@@ -45,34 +35,47 @@ static void PIT_cb(void){
 
 void App_Init(void)
 {
-	dev = LEDM_Init(8, 8);
-	PIT_Init(PIT_1, 10);
-	PIT_SetCallback(PIT_cb, PIT_1);
+//	LEDMATRIX TEST
+//	dev = LEDM_Init(8, 8);
+//	PIT_Init(PIT_0, 10);		// PIT 0 para controlar FPS y refrescar matrix de leds,
+//	PIT_SetCallback(PIT_cb, PIT_0);
+
+	// AUDIO TEST
+
+	// Enable port clock for DAC pin
+	SIM->SCGC5 |= SIM_SCGC5_PORTB_MASK;
+
+	// Put DAC pin in pure analog mode
+	PORTB->PCR[2] = 0;   // adjust pin number to your board
+
+//	build_ramp();
+	build_sine_table();
+	Audio_Init();
 }
 
 void App_Run(void)
 {
-    if (!dev) {
-        while (1);
-    }
+// LED MATRIX TEST
+//    if (!dev) {
+//        while (1);
+//    }
+//
+//    bool ok;
+//
+//
+//    LEDM_SetBrightness(dev, 8);
+//
+//    if(start_new_frame){
+//    	start_new_frame = 0;
+//    	Visualizer_UpdateFrame(dev);
+//
+//    	ok = LEDM_Show(dev);
+//    	if(ok){
+//    		while(LEDM_TransferInProgress());
+//    	}
+//    	LEDM_Clear(dev);
+//    }
 
-    LEDM_color_t red = { .r = 0xFF, .g = 0x00, .b = 0x00 };
-    LEDM_color_t green = { .r = 0x00, .g = 0xFF, .b = 0x00 };
-    LEDM_color_t blue = { .r = 0x00, .g = 0x00, .b = 0xFF };
-
-
-    LEDM_SetBrightness(dev, 8);
-
-    if(start_new_frame){
-    	start_new_frame = 0;
-    	Visualizer_UpdateFrame(dev);
-
-    	ok = LEDM_Show(dev);
-    	if(ok){
-    		while(LEDM_TransferInProgress());
-    	}
-    	LEDM_Clear(dev);
-    }
 }
 
 
