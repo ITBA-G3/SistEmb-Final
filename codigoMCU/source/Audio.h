@@ -1,8 +1,24 @@
-/*
- * Audio.h
+/**
+ * @file     Audio.h
+ * @brief Audio output driver using PIT-triggered DMA to DAC with ping-pong buffering.
  *
- *  Created on: 14 Dec 2025
- *      Author: lucia
+ * This module implements a continuous audio streaming path from RAM to the DAC
+ * using the Kinetis K64 PIT as a sample-rate timebase and eDMA for transfers.
+ * A ping-pong (double) buffer scheme is used so that one buffer is played by DMA
+ * while the other buffer is refilled by the CPU in the background.
+ *
+ * The current implementation refills buffers with a generated sine wave for
+ * validation. In the final system, buffers will be refilled with decoded PCM
+ * audio samples (e.g., from an MP3 decoder).
+ *
+ * @note The application must call ::Audio_Service() periodically to keep the
+ *       ping-pong buffers refilled and avoid underruns.
+ *
+ * @author   Grupo 3
+  	  	  	  - Ezequiel Díaz Guzmán
+  	  	  	  - José Iván Hertter
+  	  	  	  - Cristian Damián Meichtry
+  	  	  	  - Lucía Inés Ruiz
  */
 
 #ifndef AUDIO_H_
@@ -21,12 +37,28 @@
 #define DAC_MAX         ((1u << DAC_BITS) - 1u)
 #define DAC_MID         (DAC_MAX / 2u)
 
-extern uint16_t audio_buffer[AUDIO_BUF_LEN];
+// Flags defined in App.c as globals
 extern volatile bool PIT_trigger;
 extern volatile bool DMA_trigger;
 
+// Ping-pong buffers are defined in App.c
+extern volatile uint16_t bufA[AUDIO_BUF_LEN];
+extern volatile uint16_t bufB[AUDIO_BUF_LEN];
+
+/**
+ * @brief Initializes the audio module.
+ *
+ * Sets up PIT timing, DAC output, DMA transfers, and internal state required
+ * for ping-pong buffered audio playback.
+ */
 void Audio_Init(void);
-void build_sine_table(void); // FOR TESTING
-void build_ramp(void);
+
+/**
+ * @brief Services audio buffer refilling.
+ *
+ * This function must be called from the main loop to refill audio buffers
+ * once they are released by the DMA engine.
+ */
+void Audio_Service(void);
 
 #endif /* AUDIO_H_ */

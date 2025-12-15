@@ -25,6 +25,9 @@ static bool start_new_frame;
 volatile bool PIT_trigger;
 volatile bool DMA_trigger;
 
+volatile uint16_t bufA[AUDIO_BUF_LEN];
+volatile uint16_t bufB[AUDIO_BUF_LEN];
+
 
 static void PIT_cb(void){
 	start_new_frame = true;
@@ -52,7 +55,7 @@ void App_Init(void)
 	PORTB->PCR[2] = 0;   // adjust pin number to your board
 
 //	build_ramp();
-	build_sine_table();
+//	build_sine_table();
 	Audio_Init();
 	__enable_irq();
 }
@@ -81,6 +84,8 @@ void App_Run(void)
 //    }
 
     // AUDIO TEST
+	Audio_Service();
+
     if(PIT_trigger){
     	PIT_trigger = false;
     }
