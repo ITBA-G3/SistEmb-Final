@@ -22,6 +22,8 @@
 #define DAC_MID         (DAC_MAX / 2u)
 
 extern uint16_t audio_buffer[AUDIO_BUF_LEN];
+extern volatile bool PIT_trigger;
+extern volatile bool DMA_trigger;
 
 void Audio_Init(void);
 void build_sine_table(void); // FOR TESTING

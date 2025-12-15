@@ -13,12 +13,20 @@ uint16_t audio_buffer[AUDIO_BUF_LEN];
 
 static void AudioDMA_cb(void){
 	// do nithing for now. later refill audio_buffer[]
+	DMA_trigger = true;
+//	DMA_SetEnableRequest(DMA_CH1, true);
+
+}
+
+static void PIT_cb(void){
+	PIT_trigger = true;
 }
 
 void Audio_Init(void)
 {
     PIT_Init(PIT_1, AUDIO_FS_HZ);
-    PIT_DisableInterrupt(PIT_1);
+//    PIT_DisableInterrupt(PIT_1);
+    PIT_SetCallback(PIT_cb, PIT_1);
 
     DAC_Init(DAC0);
     DAC_SetData(DAC0, DAC_MID); // midscale
@@ -42,11 +50,13 @@ void Audio_Init(void)
     DMA_SetMinorLoopTransCount(DMA_CH1, 2); // 1 sample = 2 bytes
 
     // Major loop counts: set once
+
 	DMA_SetStartMajorLoopCount(DMA_CH1, AUDIO_BUF_LEN);
 	DMA_SetCurrMajorLoopCount (DMA_CH1, AUDIO_BUF_LEN);
 
     // Wrap source back to buffer start after major loop:
     // SLAST = -(bytes transferred per major loop) = -(2 * AUDIO_BUF_LEN)
+
     DMA_SetSourceLastAddrOffset(DMA_CH1, -(int32_t)(2 * AUDIO_BUF_LEN));
 
     // Destination does not move

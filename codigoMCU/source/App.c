@@ -22,6 +22,9 @@
 static LEDM_t *dev;
 static bool start_new_frame;
 
+volatile bool PIT_trigger;
+volatile bool DMA_trigger;
+
 
 static void PIT_cb(void){
 	start_new_frame = true;
@@ -42,20 +45,21 @@ void App_Init(void)
 
 	// AUDIO TEST
 
-	// Enable port clock for DAC pin
+	 //Enable port clock for DAC pin
 	SIM->SCGC5 |= SIM_SCGC5_PORTB_MASK;
 
-	// Put DAC pin in pure analog mode
+	 //Put DAC pin in pure analog mode
 	PORTB->PCR[2] = 0;   // adjust pin number to your board
 
 //	build_ramp();
 	build_sine_table();
 	Audio_Init();
+	__enable_irq();
 }
 
 void App_Run(void)
 {
-// LED MATRIX TEST
+//// LED MATRIX TEST
 //    if (!dev) {
 //        while (1);
 //    }
@@ -76,6 +80,13 @@ void App_Run(void)
 //    	LEDM_Clear(dev);
 //    }
 
+    // AUDIO TEST
+    if(PIT_trigger){
+    	PIT_trigger = false;
+    }
+    if(DMA_trigger){
+    	DMA_trigger = false;
+    }
 }
 
 
