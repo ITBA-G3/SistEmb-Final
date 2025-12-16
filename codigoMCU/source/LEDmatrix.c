@@ -25,8 +25,6 @@ LEDM_t* LEDM_Init(uint16_t width, uint16_t height){
     matrix->pixels = g_pixels;
     memset(matrix->pixels, 0, sizeof(g_pixels));
 
-    matrix->transfer_in_progress = false;
-
     if (!WS2_TransportInit()) {
             return NULL;
     }
@@ -38,16 +36,13 @@ void LEDM_Deinit(LEDM_t* matrix)
 {
     if (!matrix) return;
     WS2_TransportDeinit();
-    free(matrix->pixels);
-    free(matrix);
 }
 
 bool LEDM_SetPixel(LEDM_t* matrix, uint8_t y, uint8_t x, LEDM_color_t color){
 
     if (!matrix) return false;
 
-    if (x > matrix->width || y > matrix->height) return false;
-
+    if (x >= matrix->width || y >= matrix->height) return false;
 
     uint16_t led_index = LEDM_GetPhysicalIndex(x,y);
 
@@ -71,7 +66,7 @@ bool LEDM_TransferInProgress()
 bool LEDM_Show(LEDM_t* matrix)
 {
     if (!matrix) return false;
-    if (matrix->transfer_in_progress) return false;
+//    if (LEDM_TransferInProgress()) return false;
     if (matrix->num_pixels > 64) return false;
 
     uint8_t tx[64 * 3];
@@ -83,9 +78,7 @@ bool LEDM_Show(LEDM_t* matrix)
         tx[i*3 + 2] = (uint8_t)(((uint16_t)c.b * matrix->brightness) / 255);
     }
 
-    matrix->transfer_in_progress = true;
     bool status = WS2_TransportSend(tx, matrix->num_pixels * 3);
-    matrix->transfer_in_progress = false;
 
     return status;
 }

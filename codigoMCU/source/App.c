@@ -10,6 +10,8 @@
 #include "LEDmatrix.h"
 #include "drivers/PIT.h"
 #include "Visualizer.h"
+#include "FFT.h"
+#include <math.h>
 #include "Audio.h"
 
 /*******************************************************************************
@@ -19,7 +21,7 @@
 /*******************************************************************************
  * FUNCTION PROTOTYPES FOR PRIVATE FUNCTIONS WITH FILE LEVEL SCOPE
  ******************************************************************************/
-static LEDM_t *dev;
+static LEDM_t *matrix;
 static bool start_new_frame;
 
 volatile bool PIT_trigger;
@@ -29,9 +31,8 @@ volatile uint16_t bufA[AUDIO_BUF_LEN];
 volatile uint16_t bufB[AUDIO_BUF_LEN];
 
 
-static void PIT_cb(void){
-	start_new_frame = true;
-}
+static void make_test_pcm(int16_t *pcm, uint32_t fs_hz);
+static void PIT_cb(void);
 
 /*******************************************************************************
  *******************************************************************************
@@ -42,56 +43,71 @@ static void PIT_cb(void){
 void App_Init(void)
 {
 //	LEDMATRIX TEST
-//	dev = LEDM_Init(8, 8);
-//	PIT_Init(PIT_0, 10);		// PIT 0 para controlar FPS y refrescar matrix de leds,
-//	PIT_SetCallback(PIT_cb, PIT_0);
+	matrix = LEDM_Init(8, 8);
+	PIT_Init(PIT_0, 10);		// PIT 0 para controlar FPS y refrescar matrix de leds,
+	PIT_SetCallback(PIT_cb, PIT_0);
+	FFT_Init();
 
 	// AUDIO TEST
 
-	 //Enable port clock for DAC pin
-	SIM->SCGC5 |= SIM_SCGC5_PORTB_MASK;
-
-	 //Put DAC pin in pure analog mode
-	PORTB->PCR[2] = 0;   // adjust pin number to your board
-
-//	build_ramp();
-//	build_sine_table();
-	Audio_Init();
-	__enable_irq();
+//	 //Enable port clock for DAC pin
+//	SIM->SCGC5 |= SIM_SCGC5_PORTB_MASK;
+//
+//	 //Put DAC pin in pure analog mode
+//	PORTB->PCR[2] = 0;   // adjust pin number to your board
+//
+//	Audio_Init();
+//	__enable_irq();
 }
 
 void App_Run(void)
 {
-//// LED MATRIX TEST
-//    if (!dev) {
-//        while (1);
-//    }
+// LED MATRIX TEST
+    if (!matrix) {
+        while (1);
+    }
+
+    bool ok;
+    static int16_t frame[FFT_N];
+    static float bands[8];
+    int nonzero=0;
+
+
+    LEDM_SetBrightness(matrix, 8);
+
+    if(start_new_frame){
+    	start_new_frame = 0;
+
+//    	Visualizer_UpdateFrame(matrix);
 //
-//    bool ok;
-//
-//
-//    LEDM_SetBrightness(dev, 8);
-//
-//    if(start_new_frame){
-//    	start_new_frame = 0;
-//    	Visualizer_UpdateFrame(dev);
-//
-//    	ok = LEDM_Show(dev);
+//    	ok = LEDM_Show(matrix);
 //    	if(ok){
 //    		while(LEDM_TransferInProgress());
 //    	}
-//    	LEDM_Clear(dev);
+//    	LEDM_Clear(matrix);
+
+    	make_test_pcm(frame, AUDIO_FS_HZ);
+
+    	FFT_ComputeBands(frame, FFT_N, AUDIO_FS_HZ, bands);
+
+    	Visualizer_DrawBars(bands, matrix);
+    	ok = LEDM_Show(matrix);
+    	if(ok){
+			while(LEDM_TransferInProgress());
+		}
+		LEDM_Clear(matrix);
+    }
+
+
+//    // AUDIO TEST
+//	Audio_Service();
+//
+//    if(PIT_trigger){
+//    	PIT_trigger = false;
 //    }
-
-    // AUDIO TEST
-	Audio_Service();
-
-    if(PIT_trigger){
-    	PIT_trigger = false;
-    }
-    if(DMA_trigger){
-    	DMA_trigger = false;
-    }
+//    if(DMA_trigger){
+//    	DMA_trigger = false;
+//    }
 }
 
 
@@ -100,6 +116,31 @@ void App_Run(void)
 						LOCAL FUNCTION DEFINITIONS
  *******************************************************************************
  ******************************************************************************/
+
+static void make_test_pcm(int16_t *pcm, uint32_t fs_hz)
+{
+    static float ph1=0;
+//    float f1 = 93.75f;  // instead of 94.0f
+    float f1 = 281.25f;
+
+
+    float inc1 = 2.0f * (float)M_PI * f1 / (float)fs_hz;
+
+    for (uint32_t i = 0; i < FFT_N; i++) {
+        float s = 1.0f*sinf(ph1);
+//        if (s >  1.0f) s =  1.0f;
+//        if (s < -1.0f) s = -1.0f;
+
+        pcm[i] = (int16_t)(s * 32767.0f);
+
+        ph1 += inc1; if (ph1 > 2.0f*(float)M_PI) ph1 -= 2.0f*(float)M_PI;
+    }
+}
+
+static void PIT_cb(void){
+	start_new_frame = true;
+}
+
 
 /*******************************************************************************
  ******************************************************************************/

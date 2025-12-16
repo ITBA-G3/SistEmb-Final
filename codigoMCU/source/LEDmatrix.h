@@ -21,7 +21,6 @@ typedef struct {
 	uint16_t height;
 	uint32_t num_pixels;
 	uint8_t brightness;
-	bool transfer_in_progress;
 } LEDM_t;
 
 LEDM_t* LEDM_Init(uint16_t width, uint16_t height);
