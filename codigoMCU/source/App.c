@@ -9,9 +9,16 @@
  ******************************************************************************/
 #include "App.h"
 #include "os.h"
+#include "cpu.h"
 #include "board.h"
 #include "tick.h"
 #include "MK64F12.h"
+
+#include "LEDMatrix.h"
+#include "Visualizer.h"
+#include "drivers/SD/sd.h"
+#include "drivers/Encoder/encoder.h"
+#include "gpio.h"
 
 /*******************************************************************************
  * CONSTANT AND MACRO DEFINITIONS USING #DEFINE
