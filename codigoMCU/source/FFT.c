@@ -189,8 +189,9 @@ void FFT_ComputeBands(const int16_t *pcm, size_t n, uint32_t fs_hz, float out_ba
         float acc = 0.0f;
         for (uint32_t k = k0; k < k1; k++) acc += g_mag2[k];
 
-        const float inv_len = 1.0f / (float)(k1 - k0);
-        bands[b] = acc * inv_len; // mean mag^2 in band
+//        const float inv_len = 1.0f / (float)(k1 - k0);
+//        bands[b] = acc * inv_len; // mean mag^2 in band AVERAGE SPECTRAL POWER DENSITY.
+        bands[b] = acc; // TOTAL ENERGY IN BAND
     }
 
     // Map to display range (dB mapping)

@@ -119,21 +119,37 @@ void App_Run(void)
 
 static void make_test_pcm(int16_t *pcm, uint32_t fs_hz)
 {
-    static float ph1=0;
-//    float f1 = 93.75f;  // instead of 94.0f
-    float f1 = 400.0f;
+    static float ph1 = 0.0f;
+    static float ph2 = 0.0f;
 
+    /* Pick one low-band tone + one mid/high-band tone.
+       Examples for Fs=48k, N=1024 (bin spacing 46.875 Hz):
+       - 281.25 Hz  (k=6)  -> band 250–500
+       - 3000.0 Hz  (k=64) -> band 2000–4000
+    */
+    const float f1 = 281.25f;
+    const float f2 = 3000.0f;
 
-    float inc1 = 2.0f * (float)M_PI * f1 / (float)fs_hz;
+    const float inc1 = 2.0f * (float)M_PI * f1 / (float)fs_hz;
+    const float inc2 = 2.0f * (float)M_PI * f2 / (float)fs_hz;
+
+    /* Keep headroom: sum of two sines can reach 2.0.
+       Using 0.35 + 0.35 keeps peak <= 0.70, no clipping.
+     */
+    const float a1 = 0.35f;
+    const float a2 = 0.35f;
 
     for (uint32_t i = 0; i < FFT_N; i++) {
-        float s = 1.0f*sinf(ph1);
-//        if (s >  1.0f) s =  1.0f;
-//        if (s < -1.0f) s = -1.0f;
+        float s = a1 * sinf(ph1) + a2 * sinf(ph2);
+
+        // Optional hard clip (should never trigger with the amplitudes above)
+        if (s >  1.0f) s =  1.0f;
+        if (s < -1.0f) s = -1.0f;
 
         pcm[i] = (int16_t)(s * 32767.0f);
 
-        ph1 += inc1; if (ph1 > 2.0f*(float)M_PI) ph1 -= 2.0f*(float)M_PI;
+        ph1 += inc1; if (ph1 >= 2.0f*(float)M_PI) ph1 -= 2.0f*(float)M_PI;
+        ph2 += inc2; if (ph2 >= 2.0f*(float)M_PI) ph2 -= 2.0f*(float)M_PI;
     }
 }
 
