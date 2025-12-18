@@ -161,6 +161,8 @@ void FFT_ComputeBands(const int16_t *pcm, size_t n, uint32_t fs_hz, float out_ba
     }
 
     const float eps = 1e-20f;
+
+    // TODO: db scale in dBFS check scale change to dbV? maybe.
     const float db_min = -50.0f;
 
     // 1*sinf(f) --> db = -17.09
