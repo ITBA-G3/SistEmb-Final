@@ -154,11 +154,11 @@ void Audio_Service(void)
 {
     if (!g_need_fill) return;
 
-    /* Refill the buffer that just finished playing */
+    // Refill the buffer that just finished playing
     volatile uint16_t *dst = g_fill_next;
     g_need_fill = false;
 
-    /* For now: sine tone (later: decode PCM into dst) */
+    // For now: sine tone (later: decode PCM into dst)
     Audio_FillSine(dst, AUDIO_BUF_LEN);
 }
 
