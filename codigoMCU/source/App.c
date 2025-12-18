@@ -121,7 +121,7 @@ static void make_test_pcm(int16_t *pcm, uint32_t fs_hz)
 {
     static float ph1=0;
 //    float f1 = 93.75f;  // instead of 94.0f
-    float f1 = 281.25f;
+    float f1 = 400.0f;
 
 
     float inc1 = 2.0f * (float)M_PI * f1 / (float)fs_hz;
