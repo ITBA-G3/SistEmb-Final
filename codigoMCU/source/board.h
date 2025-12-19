@@ -11,7 +11,7 @@
  * INCLUDE HEADER FILES
  ******************************************************************************/
 
-#include "gpio.h"
+#include "drivers/gpio.h"
 
 
 /*******************************************************************************
@@ -47,9 +47,9 @@
 #define	PIN_SSEG_MUX_1	PORTNUM2PIN(PC,7)
 
 // Encoder
-#define	PIN_ENCODER_A		PORTNUM2PIN(PC,0)
-#define	PIN_ENCODER_B		PORTNUM2PIN(PC,9)
-#define	PIN_ENCODER_SWITCH	PORTNUM2PIN(PC,8)
+#define	PIN_ENCODER_A		PORTNUM2PIN(PC,3)
+#define	PIN_ENCODER_B		PORTNUM2PIN(PC,2)
+#define	PIN_ENCODER_SWITCH	PORTNUM2PIN(PD,1)
 
 // LED's Informativos
 #define	PIN_INFO_LED_0	PORTNUM2PIN(PC,1)

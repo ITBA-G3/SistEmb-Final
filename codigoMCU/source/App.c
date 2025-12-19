@@ -7,6 +7,7 @@
 /*******************************************************************************
  * INCLUDE HEADER FILES
  ******************************************************************************/
+#include "drivers/pisr.h"
 #include "drivers/PIT.h"
 #include "drivers/SD/sd.h"
 #include "drivers/Encoder/encoder.h"
@@ -22,6 +23,7 @@
 #include "MK64F12.h"
 #include "gpio.h"
 
+#include <stdio.h>
 #include <math.h>
 /*******************************************************************************
  * CONSTANT AND MACRO DEFINITIONS USING #DEFINE
