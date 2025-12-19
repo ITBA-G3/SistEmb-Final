@@ -13,7 +13,7 @@
 
  #include "../../SDK/startup/hardware.h"
  #include "../../SDK/CMSIS/MK64F12.h"
- #include "../../pisr.h"
+ #include "../pisr.h"
  #include <stdbool.h>
  #include <stdarg.h>
 

@@ -10,7 +10,7 @@
 #include "hardware.h"
 #include "MK64F12.h"
 #include "board.h"
-#include "gpio.h"
+#include "../gpio.h"
 
 #include "sdhc.h"
 ///*******************************************************************************
@@ -111,7 +111,7 @@ static sdhc_adma2_desc_t adma2_desc __attribute__((aligned(32)));
 ///*******************************************************************************
 // * STATIC VARIABLES AND CONST VARIABLES WITH FILE LEVEL SCOPE
 // ******************************************************************************/
-__ISR__ SDHC_IRQHandler(void);
+void SDHC_IRQHandler(void);
 
 static void SDHC_CardDetectedHandler(void);
 static void SDHC_setCardDetectInterrupt(void);
@@ -833,7 +833,7 @@ static void SDHC_DataHandler(uint32_t status)
  ******************************************************************************/
 
 
-__ISR__ SDHC_IRQHandler(void)
+void SDHC_IRQHandler(void)
 {
 	// Get the current status of all interrupt status flags
 	uint32_t status = SDHC->IRQSTAT;

@@ -20,18 +20,10 @@
  ******************************************************************************/
 
 #include "fsl_device_registers.h"
-#include "core_cm4.h"
-#include <stdbool.h>
-#include <stdint.h>
 
-#define __CORE_CLOCK__  100000000U
-#define __FOREVER__     for(;;)
-#define __ISR__         void __attribute__ ((interrupt))
+#define __CORE_CLOCK__ 	100000000U
 
 void hw_Init (void);
-
-void hw_EnableInterrupts (void);
-void hw_DisableInterrupts (void);
 
 /* See IRQn_Type for IRQn definitions
  * Example: NVIC_EnableIRQ(SysTick_IRQn);

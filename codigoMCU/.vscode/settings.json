@@ -55,5 +55,14 @@
   "C_Cpp_Runner.useLeakSanitizer": false,
   "C_Cpp_Runner.showCompilationTime": false,
   "C_Cpp_Runner.useLinkTimeOptimization": false,
-  "C_Cpp_Runner.msvcSecureNoWarnings": false
+  "C_Cpp_Runner.msvcSecureNoWarnings": false,
+  "files.associations": {
+    "os.h": "c",
+    "display.h": "c",
+    "display_board.h": "c",
+    "magnetic_reader.h": "c",
+    "encoder.h": "c",
+    "board.h": "c",
+    "gpio.h": "c"
+  }
 }

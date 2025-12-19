@@ -15,13 +15,13 @@
 #include "LEDmatrix.h"
 #include "Visualizer.h"
 #include "FFT.h"
-#include "App.h"
+//#include "App.h"
 #include "os.h"
 #include "cpu.h"
 #include "board.h"
-#include "tick.h"
+//#include "tick.h"
 #include "MK64F12.h"
-#include "gpio.h"
+#include "drivers/gpio.h"
 
 #include <stdio.h>
 #include <math.h>
@@ -85,7 +85,7 @@ static void SD_Task(void *p_arg);
 int main(void) {
     OS_ERR err;
 
-    Board_Init();
+//    Board_Init();
     OSInit(&err);
     OS_CPU_SysTickInit(SystemCoreClock / (uint32_t)OSCfg_TickRate_Hz);
     
@@ -109,18 +109,18 @@ void App_Run(void) {
 }
 
 void App_Start(void) {
-    Display_Init();
-    LedMatrix_Init();
-    SD_Init();
-    Encoder_Init();
+//    Display_Init();
+//    LedMatrix_Init();
+//    SD_Init();
+//    Encoder_Init();
 }
 
 void App_ModuleInit(void) {
     // Initialize application modules here
-    Display_HwInit();      // GPIO, reset pins
-    LedMatrix_HwInit();    // GPIO direction, timers
-    SD_HwInit();           // SD pins, power enable
-    Encoder_HwInit();      // GPIO + EXTI config
+//    Display_HwInit();      // GPIO, reset pins
+//    LedMatrix_HwInit();    // GPIO direction, timers
+//    SD_HwInit();           // SD pins, power enable
+//    Encoder_HwInit();      // GPIO + EXTI config
 }
 
 static void App_TaskCreate(void) {
