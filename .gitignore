@@ -1,0 +1,25 @@
+# ---> KiCad
+# For PCBs designed using KiCad: https://www.kicad.org/
+# Format documentation: https://kicad.org/help/file-formats/
+
+# Temporary files
+*.000
+*.bak
+*.bck
+*.kicad_pcb-bak
+*.kicad_sch-bak
+*-backups
+*.kicad_prl
+*.sch-bak
+*~
+_autosave-*
+*.tmp
+*-save.pro
+*-save.kicad_pcb
+*.kicad_sch.lck
+*.kicad_pcb.lck
+fp-info-cache
+*#auto_saved_files#
+
+# Directories
+PCB/mp3_player/mp3_player-backups
