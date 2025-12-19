@@ -1,4 +1,5 @@
 /Debug/
-
-.cproject
+*.vscode
+*.cproject
 *.launch
+*.xml
