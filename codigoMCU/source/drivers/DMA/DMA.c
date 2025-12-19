@@ -13,11 +13,10 @@ void DMA_Init(){
 
     // Limpiar todos los eventos pendientes
     NVIC_ClearPendingIRQ(DMA0_IRQn);  // Limpiar IRQ pendiente para DMA0
-    NVIC_ClearPendingIRQ(DMA1_IRQn);  // Limpiar IRQ pendiente para DMA1
 
     // Interrupciones DMA
     NVIC_EnableIRQ(DMA0_IRQn);  // Habilitar interrupción para DMA0
-    NVIC_EnableIRQ(DMA1_IRQn); // Habilitar interrupción para DMA1
+    NVIC_EnableIRQ(DMA1_IRQn);
 }
 
 void DMA_StartTransfer(DMAChannel_t channel){
@@ -26,14 +25,21 @@ void DMA_StartTransfer(DMAChannel_t channel){
 
 // habilita el DMAMUX, configura el modo de disparo y selecciona fuente de datos
 void DMAMUX_ConfigChannel(DMAChannel_t channel, bool enable, bool trigger, dma_request_source_t source){
-    DMA0->TCD[channel].CSR = 0;  // Limpia registro de control y estado del TCD
-    DMAMUX0->CHCFG[channel] = DMAMUX_CHCFG_ENBL(enable) + DMAMUX_CHCFG_SOURCE(source) + DMAMUX_CHCFG_TRIG(trigger);  // Ajustes de DMAMUX
+//    DMA0->TCD[channel].CSR = 0;  // Limpia registro de control y estado del TCD
+	// CAPAZ DESCOMENTAR.
+	 uint32_t src = ((uint32_t)source) & 0x3Fu; // SOURCE is 6 bits
+
+	    DMAMUX0->CHCFG[channel] =
+	        DMAMUX_CHCFG_SOURCE(src) |
+	        DMAMUX_CHCFG_TRIG(trigger) |
+	        DMAMUX_CHCFG_ENBL(enable);
 }
 
 // configura interrupción en el canal
 void DMA_SetChannelInterrupt(DMAChannel_t channel, bool mode, callback_t interrupt_callback){
     callback[channel] = interrupt_callback;  //callback para la interrupción
     DMA0->TCD[channel].CSR = (DMA0->TCD[channel].CSR & ~DMA_CSR_INTMAJOR_MASK) + DMA_CSR_INTMAJOR(mode);  // habilita interrupción
+
 }
 
 
@@ -154,16 +160,34 @@ uint16_t DMA_GetStartMajorLoopCount(DMAChannel_t channel){
 	return DMA0->TCD[channel].BITER_ELINKNO & DMA_BITER_ELINKNO_BITER_MASK; //contador para el loop grande
 }
 
+void DMA_ClearChannelDoneFlag(DMAChannel_t channel) {
+    DMA0->CDNE = DMA_CDNE_CDNE(channel);
+}
+
+void DMA_ClearChannelIntFlag(DMAChannel_t channel) {
+    DMA0->CINT = DMA_CINT_CINT(channel);
+}
+
 void DMA0_IRQHandler(){
-	DMA0->CINT = 0;
-	if (callback[0] != 0){
-		callback[0]();
+	// Check channel 0
+	if (DMA0->INT & (1u << 0)) {
+		DMA_ClearChannelIntFlag(DMA_CH0);
+		if (callback[0]) callback[0]();
 	}
+
+	// Check channel 1
+//	if (DMA0->INT & (1u << 1)) {
+//		DMA_ClearChannelDoneFlag(DMA_CH1);
+//		DMA_ClearChannelIntFlag(DMA_CH1);
+//		if (callback[1]) callback[1]();
+//	}
 }
 
 void DMA1_IRQHandler(){
-	DMA0->CINT = 1; 
-	if (callback[1] != 0){
-		callback[1]();
+	// Check channel 1
+	if (DMA0->INT & (1u << 1)) {
+		DMA_ClearChannelDoneFlag(DMA_CH1);
+		DMA_ClearChannelIntFlag(DMA_CH1);
+		if (callback[1]) callback[1]();
 	}
 }

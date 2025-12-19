@@ -7,19 +7,22 @@
 /*******************************************************************************
  * INCLUDE HEADER FILES
  ******************************************************************************/
+#include "drivers/PIT.h"
+#include "drivers/SD/sd.h"
+#include "drivers/Encoder/encoder.h"
+
+#include "LEDmatrix.h"
+#include "Visualizer.h"
+#include "FFT.h"
 #include "App.h"
 #include "os.h"
 #include "cpu.h"
 #include "board.h"
 #include "tick.h"
 #include "MK64F12.h"
-
-#include "LEDMatrix.h"
-#include "Visualizer.h"
-#include "drivers/SD/sd.h"
-#include "drivers/Encoder/encoder.h"
 #include "gpio.h"
 
+#include <math.h>
 /*******************************************************************************
  * CONSTANT AND MACRO DEFINITIONS USING #DEFINE
  ******************************************************************************/
@@ -65,7 +68,6 @@ static OS_MUTEX AppMtx;     /* Application state mutex */
 void App_Init(void);
 void App_Start(void);
 void App_Run(void);
-
 /*******************************************************************************
  * FUNCTION DEFINITIONS
  ******************************************************************************/

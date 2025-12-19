@@ -96,7 +96,7 @@ typedef struct
 
 /**
  * @brief Initializes UART
- * 
+ *
  */
 void UARTinit(UARTx_t id, UARTxConfig_t *config);
 
@@ -114,7 +114,7 @@ void UARTconfig(UARTx_t id, UARTxConfig_t *config);
 /**
  * @brief Changes baudrate of desired UART. 9600 is the default value.
  *
- * @param uart 
+ * @param uart
  * @param baudrate
  */
 void UARTsetBaudRate(UARTx_t id, uint32_t baudrate);
@@ -129,7 +129,7 @@ void UARTsetDataBits(UARTx_t uart, UARTxDataBits_t dataBits);
 
 /**
  * @brief Sets parity for the desired UART. NONE is the default value
- * 
+ *
  * @param uart UARTx_t (UART_0, UART_3)
  * @param parity  UARTxParity_t (UART_PARITY_NONE, UART_PARITY_EVEN, UART_PARITY_ODD)
  */
@@ -195,7 +195,7 @@ void UARTsendString(UARTx_t uart, char *data, uint16_t length);
 uint8_t num2str(uint16_t value, char *buffer);
 /**
  * @brief Converts uint16_t to string
- * 
+ *
  * @param value Number to convert
  * @param buffer Pointer to store the string
  * @return uint8_t Length of the string
