@@ -13,12 +13,14 @@
 #include "FFT.h"
 #include <math.h>
 
+#include "Audio.h"
+
 
 //#include "App.h"
 #include "os.h"
 #include "cpu.h"
 #include "board.h"
-//#include "tick.h"
+#include "ticks.h"
 #include "MK64F12.h"
 #include "drivers/gpio.h"
 
@@ -27,8 +29,16 @@
 #include <math.h>
 #include "hardware.h"
 
+// AUDIO
+volatile bool PIT_trigger;
+volatile bool DMA_trigger;
+
+volatile uint16_t bufA[AUDIO_BUF_LEN];
+volatile uint16_t bufB[AUDIO_BUF_LEN];
+
+// LED MATRIX
 static LEDM_t *matrix;
-static bool start_new_frame;
+static volatile bool start_new_frame;
 
 static void make_test_pcm(int16_t *pcm, uint32_t fs_hz);
 static void PIT_cb(void);
@@ -51,8 +61,8 @@ static void PIT_cb(void);
 #define MAIN_STK_SIZE               256u
 #define AUDIO_STK_SIZE              256u
 #define SD_STK_SIZE                 512u
-#define DISP_STK_SIZE               256u
-#define LEDMATRIX_STK_SIZE          512u
+#define DISP_STK_SIZE               2048u
+#define LEDMATRIX_STK_SIZE          2048u
 
 /*******************************************************************************
  * RTOS OBJECTS DECLARATIONS
@@ -69,9 +79,12 @@ static OS_TCB SdTCB;
 static OS_TCB DispTCB;
 static OS_TCB LedTCB;
 
-static OS_Q     UiQ;        /* UI event queue */
-static OS_SEM   DispSem;    /* Display refresh semaphore */
+static OS_Q     UiQ;        /* UI event queue */\
 static OS_MUTEX AppMtx;     /* Application state mutex */
+
+
+static OS_SEM LedFrameSem;
+
 /*******************************************************************************
  * FUNCTION PROTOTYPES FOR PRIVATE FUNCTIONS WITH FILE LEVEL SCOPE
  ******************************************************************************/
@@ -81,23 +94,18 @@ void App_Run(void);
 /*******************************************************************************
  * FUNCTION DEFINITIONS
  ******************************************************************************/
-static void App_ModuleInit(void);
 static void App_TaskCreate(void);
 
-static void Encoder_Task(void *p_arg);
-static void Buttons_Task(void *p_arg);
+static void Main_Task(void *p_arg);
+static void Audio_Task(void *p_arg);
 static void Display_Task(void *p_arg);
 static void LedMatrix_Task(void *p_arg);
 static void SD_Task(void *p_arg);
 
 void App_Init(void) {
-    App_ModuleInit();
     App_TaskCreate();
-    //	LEDMATRIX TEST
-	matrix = LEDM_Init(8, 8);
-	PIT_Init(PIT_0, 10);		// PIT 0 para controlar FPS y refrescar matrix de leds,
-	PIT_SetCallback(PIT_cb, PIT_0);
-	FFT_Init();
+
+
 }
 
 void App_Run(void) {
@@ -108,15 +116,20 @@ static void App_TaskCreate(void) {
     OS_ERR err;
 
     // Create RTOS objects
-    OSQCreate(&UiQ, "UiQ", 16u, &err);
-    OSSemCreate(&DispSem, "DispSem", 0u, &err);
-    OSMutexCreate(&AppMtx, "AppMtx", &err);
+//    OSQCreate(&UiQ, "UiQ", 16u, &err);
+//    OSSemCreate(&DispSem, "DispSem", 0u, &err);
+//    OSMutexCreate(&AppMtx, "AppMtx", &err);
+
+	OSSemCreate(&LedFrameSem,
+	                "LedFrameSem",
+	                0u,                     // empieza en 0 → nadie pasa hasta el 1er PIT
+	                &err);
 
     // Create tasks                
 
     OSTaskCreate(&MainTCB,
                  "Main Task",
-                 Encoder_Task,
+                 Main_Task,
                  0,
                  MAIN_TASK_PRIO,
                  &MainStk[0],
@@ -127,10 +140,10 @@ static void App_TaskCreate(void) {
                  0u,
                  OS_OPT_TASK_STK_CHK,
                  &err);
-        
-    OSTaskCreatE(&AudioTCB,
+//
+    OSTaskCreate(&AudioTCB,
                  "Audio Task",
-                 Buttons_Task,
+                 Audio_Task,
                  0,
                  AUDIO_TASK_PRIO,
                  &AudioStk[0],
@@ -168,7 +181,7 @@ static void App_TaskCreate(void) {
                  0u,
                  0u,
                  0u,
-                 OS_OPT_TASK_STK_CHK,
+				 OS_OPT_TASK_STK_CHK | OS_OPT_TASK_SAVE_FP,
                  &err);
 
     OSTaskCreate(&SdTCB,
@@ -187,23 +200,42 @@ static void App_TaskCreate(void) {
 }
 
 /* TASKS */
-static void Encoder_Task(void *p_arg) {
+static void Main_Task(void *p_arg) {
     (void)p_arg;
     OS_ERR err;
 
     while (1) {
-        // encoder state 
+        // Display
 
-        OSTimeDlyHMSM(0u, 0u, 0u, 10u, OS_OPT_TIME_HMSM_STRICT, &err);
+        OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
     }
 }
 
-static void Buttons_Task(void *p_arg){
+
+static void Audio_Task(void *p_arg){
     (void)p_arg;
     OS_ERR err;
 
+	 //Enable port clock for DAC pin
+	SIM->SCGC5 |= SIM_SCGC5_PORTB_MASK;
+
+	 //Put DAC pin in pure analog mode
+	PORTB->PCR[2] = 0;   // adjust pin number to your board
+
+	Audio_Init();
+	__enable_irq();
+
     while (1) {
         // buttons state / debounce
+
+    	Audio_Service();
+
+        if(PIT_trigger){
+        	PIT_trigger = false;
+        }
+        if(DMA_trigger){
+        	DMA_trigger = false;
+        }
 
         OSTimeDlyHMSM(0u, 0u, 0u, 10u, OS_OPT_TIME_HMSM_STRICT, &err);
     }
@@ -224,36 +256,50 @@ static void LedMatrix_Task(void *p_arg) {
     (void)p_arg;
     OS_ERR err;
 
+    //	LEDMATRIX TEST
+	matrix = LEDM_Init(8, 8);
+
+	FFT_Init();
+	PIT_Init(PIT_0, 10);		// PIT 0 para controlar FPS y refrescar matrix de leds,
+	PIT_SetCallback(PIT_cb, PIT_0);
+
+	gpioMode(PORTNUM2PIN(PC,10), OUTPUT);
+	gpioWrite(PORTNUM2PIN(PC,10), 1);
+
+
+    static int16_t frame[FFT_N];
+	static float bands[8];
+
+	LEDM_SetBrightness(matrix, 8);
+
     while (1) {
         // LED matrix
     	// LED MATRIX TEST
 
-    	bool ok;
-    	static int16_t frame[FFT_N];
-    	static float bands[8];
-    	int nonzero=0;
+
+    	OSSemPend(&LedFrameSem, 0u, OS_OPT_PEND_BLOCKING, 0u, &err);
+
+		make_test_pcm(frame, AUDIO_FS_HZ);
+
+		FFT_ComputeBands(frame, FFT_N, AUDIO_FS_HZ, bands);
+    	gpioToggle(PORTNUM2PIN(PC,10));
+
+//		Visualizer_UpdateFrame(matrix);
+		Visualizer_DrawBars(bands, matrix);
+
+		bool ok = LEDM_Show(matrix);
+
+//		if(ok){
+//			while(LEDM_TransferInProgress()){
+//				OSTimeDly(1u, OS_OPT_TIME_DLY, &err);
+//			}
+//		}
+
+        OSTimeDlyHMSM(0u, 0u, 0u, 5u, OS_OPT_TIME_HMSM_STRICT, &err);
+
+		LEDM_Clear(matrix);
 
 
-    	LEDM_SetBrightness(matrix, 8);
-
-        // start_new_frame = OSQPend(&QMagReader, 0, OS_OPT_PEND_NON_BLOCKING, &p_size, NULL, &os_err);
-    	
-        if(start_new_frame){
-    		start_new_frame = 0;
-
-    		make_test_pcm(frame, AUDIO_FS_HZ);
-
-    		FFT_ComputeBands(frame, FFT_N, AUDIO_FS_HZ, bands);
-
-    		Visualizer_DrawBars(bands, matrix);
-    		ok = LEDM_Show(matrix);
-    		if(ok){
-    			while(LEDM_TransferInProgress());
-    		}
-    		LEDM_Clear(matrix);
-    	}
-
-        OSTimeDlyHMSM(0u, 0u, 0u, 10u, OS_OPT_TIME_HMSM_STRICT, &err);
     }
 }
 
@@ -305,7 +351,10 @@ static void make_test_pcm(int16_t *pcm, uint32_t fs_hz)
 }
 
 static void PIT_cb(void){
-	start_new_frame = true;
+	OS_ERR err;
+	OSSemPost(&LedFrameSem, OS_OPT_POST_1, &err);
+
+//	start_new_frame = true;
 }
 
 
@@ -328,12 +377,10 @@ int main(void)
     CPU_Init();
     App_Init();
 
-    // // OS QUEUES
-    // OSQCreate(&QMagReader, "QMagReader", (OS_MSG_QTY) QUEUE_SIZE, &os_err);
-    // OSQCreate(&QEncoder, "QEncoder", (OS_MSG_QTY) QUEUE_SIZE, &os_err);
-    // OSQCreate(&QDisplay, "QDisplay", (OS_MSG_QTY) QUEUE_SIZE, &os_err);
-
-    App_TaskCreate();
+//    // // OS QUEUES
+//     OSQCreate(&QMagReader, "QMagReader", (OS_MSG_QTY) QUEUE_SIZE, &os_err);
+//     OSQCreate(&QEncoder, "QEncoder", (OS_MSG_QTY) QUEUE_SIZE, &os_err);
+//     OSQCreate(&QDisplay, "QDisplay", (OS_MSG_QTY) QUEUE_SIZE, &os_err);
 
     App_OS_SetAllHooks();
     OSStart(&err);
