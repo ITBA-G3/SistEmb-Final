@@ -10,7 +10,7 @@
 #include "drivers/PIT.h"
 #include "drivers/SD/sd.h"
 #include "drivers/Encoder/encoder.h"
-
+#include "drivers/LCD/LCD.h"
 #include "LEDmatrix.h"
 #include "Visualizer.h"
 #include "FFT.h"
