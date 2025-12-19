@@ -1,3 +1,20 @@
+/**
+ * @file     ws2812_ftm.c
+ * @brief    WS2812 transport implementation using FTM and DMA.
+ *
+ * This file contains the low-level WS2812 driver implementation:
+ * - FTM configuration for WS2812 timing generation
+ * - DMA setup for automatic CnV register updates
+ * - Bitstream generation from GRB pixel data
+ * - DMA-based, non-blocking LED frame transmission
+ *
+ * @author   Grupo 3
+ *           - Ezequiel Díaz Guzmán
+ *           - José Iván Hertter
+ *           - Cristian Damián Meichtry
+ *           - Lucía Inés Ruiz
+ */
+
 #include "ws2812_ftm.h"
 #include "FTM.h"
 #include <stdint.h>
@@ -21,6 +38,18 @@ static void ws_build_cnv_buffer(uint8_t *buf, uint32_t len);
 static void DMA_cb(void);
 
 
+/**
+ * @brief Initializes the WS2812 transport layer using FTM0 + DMA.
+ *
+ * Configures:
+ * - FTM peripheral (via FTM_Init()) for WS2812 timing generation.
+ * - PORTC clock gating.
+ * - DMA + DMAMUX so that each FTM0 overflow triggers a DMA transfer that writes
+ *   the next CnV value into FTM0 channel 0 compare register.
+ * - DMA channel interrupt callback to detect end of major loop.
+ *
+ * @return true Always returns true in the current implementation.
+ */
 bool WS2_TransportInit(void)
 {
     FTM_Init();
@@ -53,11 +82,32 @@ bool WS2_TransportInit(void)
     return true;
 }
 
+/**
+ * @brief Deinitializes the WS2812 transport layer.
+ *
+ * Stops the FTM0 clock, halting further DMA-triggered CnV updates.
+ */
 void WS2_TransportDeinit(void)
 {
     FTM_StopClock(FTM0);
 }
 
+/**
+ * @brief Builds the DMA CnV buffer from a GRB byte stream plus reset low time.
+ *
+ * Converts each bit of the input byte stream into a CnV value:
+ * - Bit '1' -> CNV_1
+ * - Bit '0' -> CNV_0
+ *
+ * Appends WS_RESET_BITS of CNV_0 at the end to generate the WS2812 reset/latch time.
+ *
+ * Side effects:
+ * - Writes ws_cnv_buffer[]
+ * - Updates ws_total_transfers with the number of generated entries
+ *
+ * @param buf Pointer to input byte buffer (pixel data).
+ * @param len Length of input buffer in bytes.
+ */
 static void ws_build_cnv_buffer(uint8_t *buf, uint32_t len)
 {
     uint32_t bit_idx = 0;
@@ -80,7 +130,22 @@ static void ws_build_cnv_buffer(uint8_t *buf, uint32_t len)
     ws_total_transfers = bit_idx; // esto debería ser WS_TOTAL_BITS = 1576
 }
 
-
+/**
+ * @brief Starts a WS2812 DMA transfer for the provided pixel buffer.
+ *
+ * Behavior:
+ * - Rejects null/empty buffers.
+ * - Applies a one-time "first call" hardcoded skip (returns false once).
+ * - Builds the ws_cnv_buffer from the input data.
+ * - Programs DMA major-loop counters to transfer ws_total_transfers 16-bit values.
+ * - Arms DMA requests and starts the FTM0 clock so overflows trigger transfers.
+ *
+ * Note: Completion is signaled via DMA_cb(), which stops FTM0 and sets ws_dma_done.
+ *
+ * @param buf Pointer to input byte buffer (pixel data).
+ * @param len Length of input buffer in bytes.
+ * @return true if the transfer was started; false if input invalid or first-call skip triggered.
+ */
 bool WS2_TransportSend(uint8_t *buf, uint32_t len)
 {
 	static bool first_call_hardcoded_fix = true;
@@ -118,12 +183,22 @@ bool WS2_TransportSend(uint8_t *buf, uint32_t len)
     return true;
 }
 
+/**
+ * @brief Indicates whether a WS2812 DMA transfer is still running.
+ *
+ * @return true if a transfer is in progress; false if the last transfer completed.
+ */
 bool WS2_TransferInProgress(void)
 {
     return !ws_dma_done;
 }
 
-
+/**
+ * @brief DMA completion callback for the WS2812 transport transfer.
+ *
+ * Stops the FTM0 clock and marks the transfer as complete by setting ws_dma_done.
+ * This callback is registered as the DMA channel interrupt handler.
+ */
 void DMA_cb(void)
 {
     FTM_StopClock(FTM0);

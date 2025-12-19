@@ -61,3 +61,8 @@ void PIT1_IRQHandler(void){
 	PIT->CHANNEL[1].TFLG = PIT_TFLG_TIF_MASK;
 	PIT_Callbacks[1]();
 }
+
+void PIT0_IRQHandler(void){
+	PIT->CHANNEL[0].TFLG = PIT_TFLG_TIF_MASK;
+	PIT_Callbacks[0]();
+}
