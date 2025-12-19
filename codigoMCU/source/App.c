@@ -7,118 +7,252 @@
 /*******************************************************************************
  * INCLUDE HEADER FILES
  ******************************************************************************/
-#include "LEDmatrix.h"
 #include "drivers/PIT.h"
+#include "drivers/SD/sd.h"
+#include "drivers/Encoder/encoder.h"
+
+#include "LEDmatrix.h"
 #include "Visualizer.h"
 #include "FFT.h"
-#include <math.h>
+#include "App.h"
+#include "os.h"
+#include "cpu.h"
+#include "board.h"
+#include "tick.h"
+#include "MK64F12.h"
+#include "gpio.h"
 
+#include <math.h>
 /*******************************************************************************
  * CONSTANT AND MACRO DEFINITIONS USING #DEFINE
  ******************************************************************************/
+#ifndef SystemCoreClock
+#define SystemCoreClock 120000000U
+#endif
 
+// task priorities 
+#define ENC_TASK_PRIO       4u
+#define BTN_TASK_PRIO       5u
+#define DISP_TASK_PRIO      8u
+#define LED_TASK_PRIO       9u
+#define SD_TASK_PRIO        6u
+
+// stack sizes (check this values)
+#define ENC_STK_SIZE        256u
+#define BTN_STK_SIZE        256u
+#define DISP_STK_SIZE       256u
+#define LED_STK_SIZE        256u
+#define SD_STK_SIZE         512u
+
+/*******************************************************************************
+ * RTOS OBJECTS DECLARATIONS
+ ******************************************************************************/
+static CPU_STK EncStk[ENC_STK_SIZE];
+static CPU_STK BtnStk[BTN_STK_SIZE];
+static CPU_STK DispStk[DISP_STK_SIZE];
+static CPU_STK LedStk[LED_STK_SIZE];
+static CPU_STK SdStk[SD_STK_SIZE];
+
+static OS_TCB EncTCB;
+static OS_TCB BtnTCB;
+static OS_TCB DispTCB;
+static OS_TCB LedTCB;
+static OS_TCB SdTCB;
+
+static OS_Q     UiQ;        /* UI event queue */
+static OS_SEM   DispSem;    /* Display refresh semaphore */
+static OS_MUTEX AppMtx;     /* Application state mutex */
 /*******************************************************************************
  * FUNCTION PROTOTYPES FOR PRIVATE FUNCTIONS WITH FILE LEVEL SCOPE
  ******************************************************************************/
-static LEDM_t *matrix;
-static bool start_new_frame;
-
-static void make_test_pcm(int16_t *pcm, uint32_t fs_hz);
-static void PIT_cb(void);
-
+void App_Init(void);
+void App_Start(void);
+void App_Run(void);
 /*******************************************************************************
- *******************************************************************************
-						GLOBAL FUNCTION DEFINITIONS
- *******************************************************************************
+ * FUNCTION DEFINITIONS
  ******************************************************************************/
+static void App_ModuleInit(void);
+static void App_TaskCreate(void);
 
-void App_Init(void)
-{
-//	LEDMATRIX TEST
-	matrix = LEDM_Init(8, 8);
-	PIT_Init(PIT_0, 10);		// PIT 0 para controlar FPS y refrescar matrix de leds,
-	PIT_SetCallback(PIT_cb, PIT_0);
-	FFT_Init();
-}
+static void Encoder_Task(void *p_arg);
+static void Buttons_Task(void *p_arg);
+static void Display_Task(void *p_arg);
+static void LedMatrix_Task(void *p_arg);
+static void SD_Task(void *p_arg);
 
-void App_Run(void)
-{
-// LED MATRIX TEST
-    if (!matrix) {
-        while (1);
-    }
+int main(void) {
+    OS_ERR err;
 
-    bool ok;
-    static int16_t frame[FFT_N];
-    static float bands[8];
-    int nonzero=0;
+    Board_Init();
+    OSInit(&err);
+    OS_CPU_SysTickInit(SystemCoreClock / (uint32_t)OSCfg_TickRate_Hz);
+    
+    CPU_Init();
+    App_Init();
+    App_Start();
+    OSStart(&err);
 
-
-    LEDM_SetBrightness(matrix, 8);
-
-    if(start_new_frame){
-    	start_new_frame = 0;
-
-    	make_test_pcm(frame, AUDIO_FS_HZ);
-
-    	FFT_ComputeBands(frame, FFT_N, AUDIO_FS_HZ, bands);
-
-    	Visualizer_DrawBars(bands, matrix);
-    	ok = LEDM_Show(matrix);
-    	if(ok){
-			while(LEDM_TransferInProgress());
-		}
-		LEDM_Clear(matrix);
+    while (1) {
+        App_Run();
     }
 }
 
+void App_Init(void) {
+    App_ModuleInit();
+    App_TaskCreate();
+}
 
-/*******************************************************************************
- *******************************************************************************
-						LOCAL FUNCTION DEFINITIONS
- *******************************************************************************
- ******************************************************************************/
+void App_Run(void) {
 
-static void make_test_pcm(int16_t *pcm, uint32_t fs_hz)
-{
-    static float ph1 = 0.0f;
-    static float ph2 = 0.0f;
+}
 
-    /* Pick one low-band tone + one mid/high-band tone.
-       Examples for Fs=48k, N=1024 (bin spacing 46.875 Hz):
-       - 281.25 Hz  (k=6)  -> band 250–500
-       - 3000.0 Hz  (k=64) -> band 2000–4000
-    */
-    const float f1 = 281.25f;
-    const float f2 = 3000.0f;
+void App_Start(void) {
+    Display_Init();
+    LedMatrix_Init();
+    SD_Init();
+    Encoder_Init();
+}
 
-    const float inc1 = 2.0f * (float)M_PI * f1 / (float)fs_hz;
-    const float inc2 = 2.0f * (float)M_PI * f2 / (float)fs_hz;
+void App_ModuleInit(void) {
+    // Initialize application modules here
+    Display_HwInit();      // GPIO, reset pins
+    LedMatrix_HwInit();    // GPIO direction, timers
+    SD_HwInit();           // SD pins, power enable
+    Encoder_HwInit();      // GPIO + EXTI config
+}
 
-    /* Keep headroom: sum of two sines can reach 2.0.
-       Using 0.35 + 0.35 keeps peak <= 0.70, no clipping.
-     */
-    const float a1 = 0.35f;
-    const float a2 = 0.35f;
+static void App_TaskCreate(void) {
+    OS_ERR err;
 
-    for (uint32_t i = 0; i < FFT_N; i++) {
-        float s = a1 * sinf(ph1) + a2 * sinf(ph2);
+    // Create RTOS objects
+    OSQCreate(&UiQ, "UiQ", 16u, &err);
+    OSSemCreate(&DispSem, "DispSem", 0u, &err);
+    OSMutexCreate(&AppMtx, "AppMtx", &err);
 
-        // Optional hard clip (should never trigger with the amplitudes above)
-        if (s >  1.0f) s =  1.0f;
-        if (s < -1.0f) s = -1.0f;
+    // Create tasks
+    OSTaskCreate(&EncTCB,
+                 "Encoder Task",
+                 Encoder_Task,
+                 0,
+                 ENC_TASK_PRIO,
+                 &EncStk[0],
+                 ENC_STK_SIZE / 10u,
+                 ENC_STK_SIZE,
+                 0u,
+                 0u,
+                 0u,
+                 OS_OPT_TASK_STK_CHK,
+                 &err);
 
-        pcm[i] = (int16_t)(s * 32767.0f);
+    OSTaskCreate(&BtnTCB,
+                 "Buttons Task",
+                 Buttons_Task,
+                 0,
+                 BTN_TASK_PRIO,
+                 &BtnStk[0],
+                 BTN_STK_SIZE / 10u,
+                 BTN_STK_SIZE,
+                 0u,
+                 0u,
+                 0u,
+                 OS_OPT_TASK_STK_CHK,
+                 &err);                 
 
-        ph1 += inc1; if (ph1 >= 2.0f*(float)M_PI) ph1 -= 2.0f*(float)M_PI;
-        ph2 += inc2; if (ph2 >= 2.0f*(float)M_PI) ph2 -= 2.0f*(float)M_PI;
+    OSTaskCreate(&DispTCB,
+                 "Display Task",
+                 Display_Task,
+                 0,
+                 DISP_TASK_PRIO,
+                 &DispStk[0],
+                 DISP_STK_SIZE / 10u,
+                 DISP_STK_SIZE,
+                 0u,
+                 0u,
+                 0u,
+                 OS_OPT_TASK_STK_CHK,
+                 &err);
+
+    OSTaskCreate(&LedTCB,
+                 "LedMatrix Task",
+                 LedMatrix_Task,
+                 0,
+                 LED_TASK_PRIO,
+                 &LedStk[0],
+                 LED_STK_SIZE / 10u,
+                 LED_STK_SIZE,
+                 0u,
+                 0u,
+                 0u,
+                 OS_OPT_TASK_STK_CHK,
+                 &err);
+
+    OSTaskCreate(&SdTCB,
+                 "SD Task",
+                 SD_Task,
+                 0,
+                 SD_TASK_PRIO,
+                 &SdStk[0],
+                 SD_STK_SIZE / 10u,
+                 SD_STK_SIZE,
+                 0u,
+                 0u,
+                 0u,
+                 OS_OPT_TASK_STK_CHK,
+                 &err);
+}
+
+/* TASKS */
+static void Encoder_Task(void *p_arg) {
+    (void)p_arg;
+    OS_ERR err;
+
+    while (1) {
+        // encoder state 
+
+        OSTimeDlyHMSM(0u, 0u, 0u, 10u, OS_OPT_TIME_HMSM_STRICT, &err);
     }
 }
 
-static void PIT_cb(void){
-	start_new_frame = true;
+static void Buttons_Task(void *p_arg){
+    (void)p_arg;
+    OS_ERR err;
+
+    while (1) {
+        // buttons state / debounce
+
+        OSTimeDlyHMSM(0u, 0u, 0u, 10u, OS_OPT_TIME_HMSM_STRICT, &err);
+    }
 }
 
+static void Display_Task(void *p_arg) {
+    (void)p_arg;
+    OS_ERR err;
 
-/*******************************************************************************
- ******************************************************************************/
+    while (1) {
+        // Display
+
+        OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
+    }
+}
+
+static void LedMatrix_Task(void *p_arg) {
+    (void)p_arg;
+    OS_ERR err;
+
+    while (1) {
+        // LED matrix
+
+        OSTimeDlyHMSM(0u, 0u, 0u, 10u, OS_OPT_TIME_HMSM_STRICT, &err);
+    }
+}
+
+static void SD_Task(void *p_arg) {
+    (void)p_arg;
+    OS_ERR err;
+
+    while (1) {
+        // SD
+
+        OSTimeDlyHMSM(0u, 0u, 0u, 200u, OS_OPT_TIME_HMSM_STRICT, &err);
+    }
+}

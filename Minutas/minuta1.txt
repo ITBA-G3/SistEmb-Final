@@ -1,0 +1,9 @@
+Minuta 02/06:
+
+- MP3 Decoder/helix: En proceso de entender como funciona la libreria. Falta.
+	- Avanzar.
+- Encoder/botones: Cris acomodo el driver del encoder, hizo una mquina de estado para que quede mas ordenado.
+	- Falta verificar y probarlo
+- Vumetro: Empezado y encaminado
+	- Retomar.
+Referencias: JFS y Cande. La mayor dificultad que tuvieron camadas anteriores es en la integracion. 
