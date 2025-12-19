@@ -44,6 +44,12 @@ static void Audio_FillSine(volatile uint16_t *dst, uint32_t n);
 static void AudioDMA_cb(void){
 	DMA_trigger = true;
 
+	// 1) Disable further requests while reprogramming
+	DMA_SetEnableRequest(DMA_CH1, false);          // or clear ERQ for that channel
+
+	// 2) Clear interrupt flags / DONE (API depends on your driver)
+	DMA_ClearChannelIntFlag(DMA_CH1);
+
     volatile uint16_t *just_finished = g_playing;
     volatile uint16_t *next = (g_playing == bufA) ? bufB : bufA;
 
@@ -55,7 +61,9 @@ static void AudioDMA_cb(void){
     DMA_SetStartMajorLoopCount(DMA_CH1, AUDIO_BUF_LEN);
 
 
-    DMA_SetSourceLastAddrOffset(DMA_CH1, -(int32_t)(2 * AUDIO_BUF_LEN));    // Source wraps back to the start at the end of the major loop
+//    DMA_SetSourceLastAddrOffset(DMA_CH1, -(int32_t)(2 * AUDIO_BUF_LEN));    // Source wraps back to the start at the end of the major loop
+
+    DMA_SetEnableRequest(DMA_CH1, true);
 
     g_fill_next = just_finished;    // Tell main loop which buffer to refill
     g_need_fill = true;
@@ -152,13 +160,17 @@ void Audio_Init(void)
  */
 void Audio_Service(void)
 {
-    if (!g_need_fill) return;
+    volatile uint16_t *dst = NULL;
 
-    // Refill the buffer that just finished playing
-    volatile uint16_t *dst = g_fill_next;
-    g_need_fill = false;
+    __disable_irq();
+    if (g_need_fill) {
+        dst = g_fill_next;   // take ownership of the buffer to fill
+        g_need_fill = false; // consume the request
+    }
+    __enable_irq();
 
-    // For now: sine tone (later: decode PCM into dst)
+    if (!dst) return;
+
     Audio_FillSine(dst, AUDIO_BUF_LEN);
 }
 

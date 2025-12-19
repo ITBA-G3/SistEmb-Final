@@ -93,6 +93,7 @@ void DMA_SetEnableRequest(DMAChannel_t channel, bool enable);
  */
 bool DMA_GetEnableRequest(DMAChannel_t channel);
 
+
 /**
  * @brief Configura el módulo de la dirección de origen para un canal DMA
  *

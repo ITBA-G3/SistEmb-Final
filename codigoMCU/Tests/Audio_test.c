@@ -1,6 +1,7 @@
 /***************************************************************************/ /**
-   @file     main.c
-   @brief    MP3 Player main
+   @file     Audio_test.c
+   @brief    Testing code for Audio service.
+   - Testing ping-pong buffers
    @author   Grupo 3
   ******************************************************************************/
 
