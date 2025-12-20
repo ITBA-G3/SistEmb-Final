@@ -263,10 +263,11 @@ static void LedMatrix_Task(void *p_arg) {
 	PIT_Init(PIT_0, 10);		// PIT 0 para controlar FPS y refrescar matrix de leds,
 	PIT_SetCallback(PIT_cb, PIT_0);
 
+	// For debugging
 	gpioMode(PORTNUM2PIN(PC,10), OUTPUT);
 	gpioWrite(PORTNUM2PIN(PC,10), 1);
 	gpioMode(PORTNUM2PIN(PC,11), OUTPUT);
-	gpioWrite(PORTNUM2PIN(PC,11), 1);
+	gpioWrite(PORTNUM2PIN(PC,11), 0);
 
     static int16_t frame[FFT_N];
 	static float bands[8];
@@ -279,21 +280,17 @@ static void LedMatrix_Task(void *p_arg) {
 		make_test_pcm(frame, AUDIO_FS_HZ);
 
 		FFT_ComputeBands(frame, FFT_N, AUDIO_FS_HZ, bands);
-//    	gpioToggle(PORTNUM2PIN(PC,10));
 
-//		Visualizer_UpdateFrame(matrix);
-		Visualizer_DrawBars(bands, matrix);
+		Visualizer_UpdateFrame(matrix);
+//		Visualizer_DrawBars(bands, matrix);
 
 		bool ok = LEDM_Show(matrix);
 
 		if(ok){
 			while (LEDM_TransferInProgress()) {
-				gpioToggle(PORTNUM2PIN(PC,11));
 			    OSTimeDly(5u, OS_OPT_TIME_DLY, &err);
 			}
 		}
-//        OSTimeDlyHMSM(0u, 0u, 0u, 5u, OS_OPT_TIME_HMSM_STRICT, &err);
-		LEDM_Clear(matrix);
     }
 }
 
@@ -390,7 +387,7 @@ int main(void)
     CPU_Init();
     App_Init();
 
-//    // // OS QUEUES
+//     OS QUEUES
 //     OSQCreate(&QMagReader, "QMagReader", (OS_MSG_QTY) QUEUE_SIZE, &os_err);
 //     OSQCreate(&QEncoder, "QEncoder", (OS_MSG_QTY) QUEUE_SIZE, &os_err);
 //     OSQCreate(&QDisplay, "QDisplay", (OS_MSG_QTY) QUEUE_SIZE, &os_err);

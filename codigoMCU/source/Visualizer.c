@@ -81,7 +81,7 @@ static int energy_to_height(float e) {
  * @param matrix Pointer to the LED matrix instance to draw into.
  */
 void Visualizer_DrawBars(const float band_energy[8], LEDM_t* matrix) {
-    for (int x = 0; x < 8; x++) {
+	for (int x = 0; x < 8; x++) {
         int height = energy_to_height(band_energy[x]); // 0..8
 
         for (int y = 0; y < 8; y++) {
