@@ -277,12 +277,13 @@ static void LedMatrix_Task(void *p_arg) {
 
 		LEDM_SetBrightness(matrix, 2);
 
+		// FOR TESTING
 		make_test_pcm(frame, AUDIO_FS_HZ);
 
 		FFT_ComputeBands(frame, FFT_N, AUDIO_FS_HZ, bands);
 
-		Visualizer_UpdateFrame(matrix);
-//		Visualizer_DrawBars(bands, matrix);
+//		Visualizer_UpdateFrame(matrix);
+		Visualizer_DrawBars(bands, matrix);
 
 		bool ok = LEDM_Show(matrix);
 
