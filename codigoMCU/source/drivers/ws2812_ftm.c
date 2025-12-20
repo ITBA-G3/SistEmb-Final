@@ -24,10 +24,11 @@
 #include "hardware.h"
 #include "MK64F12.h"
 #include "gpio.h"
+#include "cpu.h"
 
 #define WS_NUM_LEDS      64
 #define WS_BITS_PER_LED  24
-#define WS_RESET_BITS    40
+#define WS_RESET_BITS    60
 #define WS_TOTAL_BITS    (WS_NUM_LEDS * WS_BITS_PER_LED+ WS_RESET_BITS)
 
 static uint16_t ws_total_transfers = 0;
@@ -132,7 +133,7 @@ static bool ws_build_cnv_buffer(const uint8_t *buf, uint32_t len)
 
     uint32_t bit_idx = 0;
 
-    for (uint32_t i = 3; i < 192; i++) {          // start at 0, not 3
+    for (uint32_t i = 0; i < 192; i++) {          // start at 0, not 3
         uint8_t byte = buf[i];
         for (int bit = 7; bit >= 0; --bit) {
             if (bit_idx >= (WS_TOTAL_BITS - WS_RESET_BITS)) return false;
@@ -140,13 +141,9 @@ static bool ws_build_cnv_buffer(const uint8_t *buf, uint32_t len)
         }
     }
 
-    for (uint32_t i = 0; i < WS_RESET_BITS+24; i++) {
+    for (uint32_t i = 0; i < WS_RESET_BITS; i++) {
         if (bit_idx >= WS_TOTAL_BITS) return false;
         ws_cnv_buffer[bit_idx++] = CNV_0;
-    }
-
-    if(ws_buf.canary){
-
     }
 
     ws_total_transfers = bit_idx; // should be exactly WS_TOTAL_BITS
@@ -182,24 +179,22 @@ bool WS2_TransportSend(uint8_t *buf, uint32_t len)
     	return false;
     }
 
-//    ws_build_cnv_buffer(buf, len);
     if (!ws_build_cnv_buffer(buf, len)) return false;
-
 
     // NBYTES cuantos bytes se transfieren en cada minor loop
     // CITER/BITER cuanto minor loops por major loop
     // SLAST y DLAST_SGA se usan para setear la dirección a la que vuelven una vez terminado el major loop
     // CSR flogs de control (int, etc)
 
-    DMA_SetStartMajorLoopCount(DMA_CH0, 1552);	// BITER
-    DMA_SetCurrMajorLoopCount(DMA_CH0, 1552); // CITER
+    DMA_SetStartMajorLoopCount(DMA_CH0, ws_total_transfers);	// BITER
+    DMA_SetCurrMajorLoopCount(DMA_CH0, ws_total_transfers); // CITER
 
     DMA_SetSourceAddr(DMA_CH0, (uint32_t)(&ws_cnv_buffer[0]));   // dirección de la fuente de datos
-    DMA_SetSourceLastAddrOffset(DMA_CH0, -((int32_t)1552 * 2)); // volver al inicio del buffer de CnV
+    DMA_SetSourceLastAddrOffset(DMA_CH0, -((int32_t)ws_total_transfers * 2)); // volver al inicio del buffer de CnV
 
     // Limpiar flags DONE / interrupt del canal
     DMA_ClearChannelDoneFlag(DMA_CH0);
-    DMA_ClearChannelIntFlag(DMA_CH0);       // just in case
+    DMA_ClearChannelIntFlag(DMA_CH0);
 
     ws_dma_done = false;
 
@@ -208,8 +203,6 @@ bool WS2_TransportSend(uint8_t *buf, uint32_t len)
     FTM_ClearOverflowFlag(FTM0);
     FTM0->CNT = 0;
     FTM_StartClock(FTM0);
-
-
 
     return true;
 }
@@ -233,8 +226,12 @@ bool WS2_TransferInProgress(void)
 void DMA_cb(void)
 {
     FTM_StopClock(FTM0);
+    FTM0->CNT = 0;
+    FTM0->CONTROLS[0].CnV = 0;           // fuerza LOW al inicio
+    FTM_ClearOverflowFlag(FTM0);
+
     // Indica que la transferencia DMA ha finalizado
-    ws_busy = false;
+//    ws_busy = false;
 
     ws_dma_done = true;
 }
