@@ -65,6 +65,25 @@ static void ws2_dump_ftm_dma(void);
 #define DISP_STK_SIZE               2048u
 #define LEDMATRIX_STK_SIZE          2048u
 
+typedef enum {
+    APP_STATE_PLAYING = 0,
+    APP_STATE_PAUSED,
+    APP_STATE_SELECT_TRACK,
+} controlState_t;
+static controlState_t currentState = APP_STATE_SELECT_TRACK;
+
+typedef enum {
+    APP_EVENT_NONE = 0,
+    APP_EVENT_PLAY,
+    APP_EVENT_PAUSE,
+    APP_EVENT_ENC_RIGHT,
+    APP_EVENT_ENC_LEFT,
+    APP_EVENT_ENC_BUTTON,
+    APP_EVENT_NEXT_TRACK,
+    APP_EVENT_PREV_TRACK,
+} controlEvent_t ;
+static controlEvent_t currentEvent = APP_EVENT_NONE;
+
 /*******************************************************************************
  * RTOS OBJECTS DECLARATIONS
  ******************************************************************************/
@@ -209,6 +228,72 @@ static void Main_Task(void *p_arg) {
         // Display
 
         OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
+
+        switch (currentState){
+        	case APP_STATE_SELECT_TRACK:
+                if(currentEvent == APP_EVENT_ENC_BUTTON){
+                    //seleccionar el track elegido
+                    currentState = APP_STATE_PLAYING;
+                    currentEvent = APP_EVENT_NONE;
+                }
+                else if(currentEvent == APP_EVENT_ENC_RIGHT ||
+                        currentEvent == APP_EVENT_NEXT_TRACK){
+                    // moverse al siguiente track sin salir del estado
+                    currentEvent = APP_EVENT_NONE;
+                }
+                else if(currentEvent == APP_EVENT_ENC_LEFT ||
+                        currentEvent == APP_EVENT_PREV_TRACK){
+                    // moverse al track anterior sin salir del estado
+                    currentEvent = APP_EVENT_NONE;
+                }
+        		break;
+        	case APP_STATE_PLAYING:
+        		if(currentEvent == APP_EVENT_PAUSE){
+                    // pausar la reproduccion
+        			currentState = APP_STATE_PAUSED;
+        			currentEvent = APP_EVENT_NONE;
+        		}
+                if(currentEvent == APP_EVENT_ENC_BUTTON ||
+                   currentEvent == APP_EVENT_ENC_LEFT ||
+                   currentEvent == APP_EVENT_ENC_RIGHT){
+                    // ir a seleccion de track
+                    currentState = APP_STATE_SELECT_TRACK;
+                    currentEvent = APP_EVENT_NONE;
+                }
+                if(currentEvent == APP_EVENT_NEXT_TRACK){
+                    // empezar a reproducir el siguiente track
+                    currentEvent = APP_EVENT_NONE;
+                }
+                if(currentEvent == APP_EVENT_PREV_TRACK){
+                    // empezar a reproducir el track anterior
+                    currentEvent = APP_EVENT_NONE;
+                }
+        		break;
+        	case APP_STATE_PAUSED:
+        		if(currentEvent == APP_EVENT_PLAY){
+                    // vuelve a reproducir
+        			currentState = APP_STATE_PLAYING;
+        			currentEvent = APP_EVENT_NONE;
+        		}
+                if(currentEvent == APP_EVENT_ENC_BUTTON ||
+                   currentEvent == APP_EVENT_ENC_LEFT ||
+                   currentEvent == APP_EVENT_ENC_RIGHT){
+                    // ir a seleccion de track
+                    currentState = APP_STATE_SELECT_TRACK;
+                    currentEvent = APP_EVENT_NONE;
+                }
+                if(currentEvent == APP_EVENT_NEXT_TRACK){
+                    // empezar a reproducir el siguiente track
+                    currentState = APP_STATE_PLAYING;
+                    currentEvent = APP_EVENT_NONE;
+                }
+                if(currentEvent == APP_EVENT_PREV_TRACK){
+                    // empezar a reproducir el track anterior
+                    currentState = APP_STATE_PLAYING;
+                    currentEvent = APP_EVENT_NONE;
+                }
+        		break;
+        }
     }
 }
 
