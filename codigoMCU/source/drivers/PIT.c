@@ -7,6 +7,7 @@
 #include "PIT.h"
 #include "MK64F12.h"
 #include <stddef.h>
+#include "os.h"
 
 #define NUMPITCHANNEL 3
 
@@ -58,11 +59,15 @@ void PIT_DisableInterrupt(uint8_t pit){
 }
 
 void PIT1_IRQHandler(void){
+	OSIntEnter();                      // tell µC/OS we are in an ISR
 	PIT->CHANNEL[1].TFLG = PIT_TFLG_TIF_MASK;
 	PIT_Callbacks[1]();
+	OSIntExit();                       // allow scheduler to run
 }
 
 void PIT0_IRQHandler(void){
+	OSIntEnter();                      // tell µC/OS we are in an ISR
 	PIT->CHANNEL[0].TFLG = PIT_TFLG_TIF_MASK;
 	PIT_Callbacks[0]();
+	OSIntExit();                       // allow scheduler to run
 }

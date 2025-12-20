@@ -85,11 +85,11 @@ void Visualizer_DrawBars(const float band_energy[8], LEDM_t* matrix) {
         int height = energy_to_height(band_energy[x]); // 0..8
 
         for (int y = 0; y < 8; y++) {
-            if (y < height) {		// x + 1 arreglo lowkey harcodeado... en lugar de prender columna 1 2 3 prendia 1 2 y 8, esto lo arregla
-            	LEDM_SetPixel(matrix, 7-y, x+1, color_for_level(y, LEDM_MAX_HEIGHT));	// de abajo hacia arriba
+            if (y < height) {
+            	LEDM_SetPixel(matrix, 7-y, x, color_for_level(y, LEDM_MAX_HEIGHT));	// de abajo hacia arriba
             }
             else {
-                LEDM_SetPixel(matrix, 7-y, x+1, (LEDM_color_t){0,0,0});
+                LEDM_SetPixel(matrix, 7-y, x, (LEDM_color_t){0,0,0});
             }
         }
     }

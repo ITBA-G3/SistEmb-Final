@@ -42,6 +42,7 @@ static volatile bool start_new_frame;
 
 static void make_test_pcm(int16_t *pcm, uint32_t fs_hz);
 static void PIT_cb(void);
+static void ws2_dump_ftm_dma(void);
 
 /*******************************************************************************
  * CONSTANT AND MACRO DEFINITIONS USING #DEFINE
@@ -265,37 +266,36 @@ static void LedMatrix_Task(void *p_arg) {
 
 	gpioMode(PORTNUM2PIN(PC,10), OUTPUT);
 	gpioWrite(PORTNUM2PIN(PC,10), 1);
+	gpioMode(PORTNUM2PIN(PC,11), OUTPUT);
+	gpioWrite(PORTNUM2PIN(PC,11), 1);
 
 
     static int16_t frame[FFT_N];
 	static float bands[8];
 
-	LEDM_SetBrightness(matrix, 8);
 
     while (1) {
-        // LED matrix
-    	// LED MATRIX TEST
-
-
     	OSSemPend(&LedFrameSem, 0u, OS_OPT_PEND_BLOCKING, 0u, &err);
 
+		LEDM_SetBrightness(matrix, 2);
+
 		make_test_pcm(frame, AUDIO_FS_HZ);
-
+//
 		FFT_ComputeBands(frame, FFT_N, AUDIO_FS_HZ, bands);
-    	gpioToggle(PORTNUM2PIN(PC,10));
+//    	gpioToggle(PORTNUM2PIN(PC,10));
 
-//		Visualizer_UpdateFrame(matrix);
-		Visualizer_DrawBars(bands, matrix);
+		Visualizer_UpdateFrame(matrix);
+//		Visualizer_DrawBars(bands, matrix);
 
 		bool ok = LEDM_Show(matrix);
 
-//		if(ok){
-//			while(LEDM_TransferInProgress()){
-//				OSTimeDly(1u, OS_OPT_TIME_DLY, &err);
-//			}
-//		}
+		if(ok){
+			while (LEDM_TransferInProgress()) {
+			    OSTimeDly(5u, OS_OPT_TIME_DLY, &err);
+			}
+		}
 
-        OSTimeDlyHMSM(0u, 0u, 0u, 5u, OS_OPT_TIME_HMSM_STRICT, &err);
+//        OSTimeDlyHMSM(0u, 0u, 0u, 5u, OS_OPT_TIME_HMSM_STRICT, &err);
 
 		LEDM_Clear(matrix);
 
@@ -353,9 +353,30 @@ static void make_test_pcm(int16_t *pcm, uint32_t fs_hz)
 static void PIT_cb(void){
 	OS_ERR err;
 	OSSemPost(&LedFrameSem, OS_OPT_POST_1, &err);
-
-//	start_new_frame = true;
+	gpioToggle(PORTNUM2PIN(PC,11));
 }
+
+
+static void ws2_dump_ftm_dma(void)
+{
+    volatile uint32_t ftm_sc   = FTM0->SC;
+    volatile uint32_t ftm_mod  = FTM0->MOD;
+    volatile uint32_t ftm_c0sc = FTM0->CONTROLS[0].CnSC;
+    volatile uint32_t ftm_c0v  = FTM0->CONTROLS[0].CnV;
+
+    volatile uint32_t erq    = DMA0->ERQ;
+    volatile uint8_t  mux0   = DMAMUX0->CHCFG[0];
+    volatile uint16_t citer  = DMA0->TCD[0].CITER_ELINKNO;
+    volatile uint16_t biter  = DMA0->TCD[0].BITER_ELINKNO;
+    volatile uint32_t csr    = DMA0->TCD[0].CSR;
+
+    (void)ftm_sc; (void)ftm_mod; (void)ftm_c0sc; (void)ftm_c0v;
+    (void)erq; (void)mux0; (void)citer; (void)biter; (void)csr;
+
+    // breakpoint here
+}
+
+
 
 
 int main(void)
@@ -383,6 +404,8 @@ int main(void)
 //     OSQCreate(&QDisplay, "QDisplay", (OS_MSG_QTY) QUEUE_SIZE, &os_err);
 
     App_OS_SetAllHooks();
+
+
     OSStart(&err);
 
     /* Should Never Get Here */
@@ -390,3 +413,5 @@ int main(void)
     {
     }
 }
+
+

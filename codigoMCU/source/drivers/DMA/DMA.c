@@ -3,6 +3,8 @@
  */
 
 #include "DMA.h"
+#include "os.h"
+#include "../gpio.h"
 
 static callback_t callback[16] = {0};
 
@@ -39,7 +41,7 @@ void DMAMUX_ConfigChannel(DMAChannel_t channel, bool enable, bool trigger, dma_r
 void DMA_SetChannelInterrupt(DMAChannel_t channel, bool mode, callback_t interrupt_callback){
     callback[channel] = interrupt_callback;  //callback para la interrupción
     DMA0->TCD[channel].CSR = (DMA0->TCD[channel].CSR & ~DMA_CSR_INTMAJOR_MASK) + DMA_CSR_INTMAJOR(mode);  // habilita interrupción
-
+    DMA0->TCD[channel].CSR |= DMA_CSR_INTMAJOR_MASK;
 }
 
 
@@ -169,25 +171,25 @@ void DMA_ClearChannelIntFlag(DMAChannel_t channel) {
 }
 
 void DMA0_IRQHandler(){
+	OSIntEnter();
+	gpioToggle(PORTNUM2PIN(PC,10));
 	// Check channel 0
 	if (DMA0->INT & (1u << 0)) {
 		DMA_ClearChannelIntFlag(DMA_CH0);
 		if (callback[0]) callback[0]();
 	}
 
-	// Check channel 1
-//	if (DMA0->INT & (1u << 1)) {
-//		DMA_ClearChannelDoneFlag(DMA_CH1);
-//		DMA_ClearChannelIntFlag(DMA_CH1);
-//		if (callback[1]) callback[1]();
-//	}
+
+	OSIntExit();
 }
 
 void DMA1_IRQHandler(){
 	// Check channel 1
+	OSIntEnter();
 	if (DMA0->INT & (1u << 1)) {
 		DMA_ClearChannelDoneFlag(DMA_CH1);
 		DMA_ClearChannelIntFlag(DMA_CH1);
 		if (callback[1]) callback[1]();
 	}
+	OSIntExit();
 }
