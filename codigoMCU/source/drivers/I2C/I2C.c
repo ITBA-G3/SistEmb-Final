@@ -37,7 +37,8 @@ void init_I2C (void)
     I2C_ptr->F = 0b10110101;// Seteo de frecuencia I2C
 
 	// Initialize subroutine
-	pisrRegister(I2C_subroutine, 100);
+	
+    tickAdd(I2C_subroutine, 100);
 }
 
 void kill_I2C (void)

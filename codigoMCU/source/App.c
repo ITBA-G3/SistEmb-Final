@@ -15,17 +15,17 @@
 
 #include "Audio.h"
 
-
 //#include "App.h"
 #include "os.h"
 #include "cpu.h"
 #include "board.h"
-#include "ticks.h"
+#include "drivers/TICKS/ticks.h"
 #include "MK64F12.h"
 #include "drivers/gpio.h"
 
 #include <stdio.h>
 #include <stdint.h>
+// #include <stdbool.h>
 #include <math.h>
 #include "hardware.h"
 
@@ -35,6 +35,8 @@ volatile bool DMA_trigger;
 
 volatile uint16_t bufA[AUDIO_BUF_LEN];
 volatile uint16_t bufB[AUDIO_BUF_LEN];
+
+bool isPlaying = false;
 
 // LED MATRIX
 static LEDM_t *matrix;
@@ -79,10 +81,10 @@ static OS_TCB SdTCB;
 static OS_TCB DispTCB;
 static OS_TCB LedTCB;
 
-static OS_Q     UiQ;        /* UI event queue */\
+static OS_Q     UiQ;        /* UI event queue */
 static OS_MUTEX AppMtx;     /* Application state mutex */
 
-
+static OS_SEM DisplaySem;
 static OS_SEM LedFrameSem;
 
 /*******************************************************************************
@@ -102,17 +104,20 @@ static void Display_Task(void *p_arg);
 static void LedMatrix_Task(void *p_arg);
 static void SD_Task(void *p_arg);
 
-void App_Init(void) {
+void App_Init(void)
+{
     App_TaskCreate();
 
 
 }
 
-void App_Run(void) {
+void App_Run(void)
+{
 
 }
 
-static void App_TaskCreate(void) {
+static void App_TaskCreate(void)
+{
     OS_ERR err;
 
     // Create RTOS objects
@@ -124,6 +129,10 @@ static void App_TaskCreate(void) {
 	                "LedFrameSem",
 	                0u,                     // empieza en 0 → nadie pasa hasta el 1er PIT
 	                &err);
+    OSSemCreate(&DisplaySem,
+                    "Display semaphore",
+                    0u,
+                    &err);
 
     // Create tasks                
 
@@ -200,7 +209,8 @@ static void App_TaskCreate(void) {
 }
 
 /* TASKS */
-static void Main_Task(void *p_arg) {
+static void Main_Task(void *p_arg)
+{
     (void)p_arg;
     OS_ERR err;
 
@@ -212,7 +222,8 @@ static void Main_Task(void *p_arg) {
 }
 
 
-static void Audio_Task(void *p_arg){
+static void Audio_Task(void *p_arg)
+{
     (void)p_arg;
     OS_ERR err;
 
@@ -228,31 +239,37 @@ static void Audio_Task(void *p_arg){
     while (1) {
         // buttons state / debounce
 
-    	Audio_Service();
+        // if (isPlaying)
+        // {
+            Audio_Service();
 
-        if(PIT_trigger){
-        	PIT_trigger = false;
-        }
-        if(DMA_trigger){
-        	DMA_trigger = false;
-        }
+            if(PIT_trigger){
+                PIT_trigger = false;
+            }
+            if(DMA_trigger){
+                DMA_trigger = false;
+            }
 
-        OSTimeDlyHMSM(0u, 0u, 0u, 10u, OS_OPT_TIME_HMSM_STRICT, &err);
-    }
+            OSTimeDlyHMSM(0u, 0u, 0u, 10u, OS_OPT_TIME_HMSM_STRICT, &err);
+        }
+    // }
 }
 
-static void Display_Task(void *p_arg) {
+static void Display_Task(void *p_arg)
+{
     (void)p_arg;
     OS_ERR err;
 
     while (1) {
         // Display
+    	OSSemPend(&DisplaySem, 0u, OS_OPT_PEND_BLOCKING, 0u, &err);
 
         OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
     }
 }
 
-static void LedMatrix_Task(void *p_arg) {
+static void LedMatrix_Task(void *p_arg)
+{
     (void)p_arg;
     OS_ERR err;
 
@@ -303,7 +320,8 @@ static void LedMatrix_Task(void *p_arg) {
     }
 }
 
-static void SD_Task(void *p_arg) {
+static void SD_Task(void *p_arg)
+{
     (void)p_arg;
     OS_ERR err;
 
@@ -350,13 +368,21 @@ static void make_test_pcm(int16_t *pcm, uint32_t fs_hz)
     }
 }
 
-static void PIT_cb(void){
+/********************************
+ *      PIT CALLBACKS
+ ********************************/
+
+static void PIT_cb(void)
+{
 	OS_ERR err;
 	OSSemPost(&LedFrameSem, OS_OPT_POST_1, &err);
 
 //	start_new_frame = true;
 }
 
+/********************************
+ *      MAIN
+ ********************************/
 
 int main(void)
 {
@@ -377,16 +403,9 @@ int main(void)
     CPU_Init();
     App_Init();
 
-//    // // OS QUEUES
-//     OSQCreate(&QMagReader, "QMagReader", (OS_MSG_QTY) QUEUE_SIZE, &os_err);
-//     OSQCreate(&QEncoder, "QEncoder", (OS_MSG_QTY) QUEUE_SIZE, &os_err);
-//     OSQCreate(&QDisplay, "QDisplay", (OS_MSG_QTY) QUEUE_SIZE, &os_err);
-
     App_OS_SetAllHooks();
     OSStart(&err);
 
     /* Should Never Get Here */
-    while (1)
-    {
-    }
+    while (1);
 }
