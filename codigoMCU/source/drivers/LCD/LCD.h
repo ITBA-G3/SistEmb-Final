@@ -14,7 +14,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "../I2C/I2C.h"
-#include "../pisr.h"
 
 #define DISPLAY_WIDTH 16
 #define PCF8574T_SLAVE_ADDR 0x27  // 0b0100111

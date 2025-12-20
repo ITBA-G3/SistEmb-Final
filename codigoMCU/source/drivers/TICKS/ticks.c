@@ -9,7 +9,6 @@ typedef struct
 } pisr_callback_t;
 
 static pisr_callback_t callbacks[MAX_FUNCTIONS];
-static bool called = false;
 static uint32_t index = 0;
 
 
@@ -25,7 +24,8 @@ void App_OS_SetAllHooks (void)                             /* os_app_hooks.c    
     CPU_CRITICAL_EXIT();
 }
 
-bool tickAdd (pinIrqFun_t funcallback, unsigned int period) {
+bool tickAdd (pisr_cb_t funcallback, unsigned int period)
+{
 	bool check = index < MAX_FUNCTIONS;
 	if (check)
 	{
