@@ -33,6 +33,9 @@
 volatile bool PIT_trigger;
 volatile bool DMA_trigger;
 
+//SD
+volatile bool playingFlag = false;
+
 volatile uint16_t bufA[AUDIO_BUF_LEN];
 volatile uint16_t bufB[AUDIO_BUF_LEN];
 
@@ -229,37 +232,56 @@ static void Main_Task(void *p_arg) {
 
         OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
 
+
         switch (currentState){
         	case APP_STATE_SELECT_TRACK:
+                // falta hacer el menu literalmente, 
+                // escribir cosas en el display
+
                 if(currentEvent == APP_EVENT_ENC_BUTTON){
-                    //seleccionar el track elegido
+                    // guardar referencia a la canción que va a empezar a reproducir (SD)
+                    // empezar transferencia SD → audio (SD decoder + audio + ledMatrix)
+                    
+                    playingFlag = true;
                     currentState = APP_STATE_PLAYING;
                     currentEvent = APP_EVENT_NONE;
                 }
                 else if(currentEvent == APP_EVENT_ENC_RIGHT ||
                         currentEvent == APP_EVENT_NEXT_TRACK){
-                    // moverse al siguiente track sin salir del estado
+                    // actualiza display con la siguiente cancion
+                    // puntero a la siguiente cancion
+                    // SD browsing (metadata)
                     currentEvent = APP_EVENT_NONE;
                 }
                 else if(currentEvent == APP_EVENT_ENC_LEFT ||
                         currentEvent == APP_EVENT_PREV_TRACK){
-                    // moverse al track anterior sin salir del estado
+                    // actualiza display con la cancion anterior
+                    // puntero a la cancion anterior
+                    // SD browsing (metadata)
                     currentEvent = APP_EVENT_NONE;
                 }
         		break;
-        	case APP_STATE_PLAYING:
+        	case APP_STATE_PLAYING: //solo espera eventos de pausa o cambio de track   
         		if(currentEvent == APP_EVENT_PAUSE){
-                    // pausar la reproduccion
+                    // pausar transferencia SD → audio (SD decoder + audio + ledMatrix)
+                    // actualiza display para mostrar estado de pausa
+                    playingFlag = false;
         			currentState = APP_STATE_PAUSED;
         			currentEvent = APP_EVENT_NONE;
         		}
                 if(currentEvent == APP_EVENT_ENC_BUTTON ||
                    currentEvent == APP_EVENT_ENC_LEFT ||
                    currentEvent == APP_EVENT_ENC_RIGHT){
-                    // ir a seleccion de track
+                    // pausar transferencia SD → audio (SD decoder + audio + ledMatrix)
+                    // actualiza display con el menu
+                    // puntero a la cancion anterior
+                    // SD browsing (metadata)
+                    playingFlag = false;
                     currentState = APP_STATE_SELECT_TRACK;
-                    currentEvent = APP_EVENT_NONE;
+                    currentEvent = APP_EVENT_NONE; //queda esperando alguna accion del encoder
                 }
+                /* coming soon... */
+                /*
                 if(currentEvent == APP_EVENT_NEXT_TRACK){
                     // empezar a reproducir el siguiente track
                     currentEvent = APP_EVENT_NONE;
@@ -268,10 +290,13 @@ static void Main_Task(void *p_arg) {
                     // empezar a reproducir el track anterior
                     currentEvent = APP_EVENT_NONE;
                 }
+                */
         		break;
         	case APP_STATE_PAUSED:
         		if(currentEvent == APP_EVENT_PLAY){
-                    // vuelve a reproducir
+                    // empezar transferencia SD → audio desde donde quedo (SD decoder + audio + ledMatrix)
+                    // actualiza display para mostrar estado de playing
+                    playingFlag = true;
         			currentState = APP_STATE_PLAYING;
         			currentEvent = APP_EVENT_NONE;
         		}
@@ -279,9 +304,12 @@ static void Main_Task(void *p_arg) {
                    currentEvent == APP_EVENT_ENC_LEFT ||
                    currentEvent == APP_EVENT_ENC_RIGHT){
                     // ir a seleccion de track
+                    playingFlag = false;
                     currentState = APP_STATE_SELECT_TRACK;
                     currentEvent = APP_EVENT_NONE;
                 }
+                /* coming soon... */
+                /*
                 if(currentEvent == APP_EVENT_NEXT_TRACK){
                     // empezar a reproducir el siguiente track
                     currentState = APP_STATE_PLAYING;
@@ -292,6 +320,7 @@ static void Main_Task(void *p_arg) {
                     currentState = APP_STATE_PLAYING;
                     currentEvent = APP_EVENT_NONE;
                 }
+                */
         		break;
         }
     }
@@ -321,6 +350,10 @@ static void Audio_Task(void *p_arg){
         }
         if(DMA_trigger){
         	DMA_trigger = false;
+        }
+
+        if(playingFlag){
+
         }
 
         OSTimeDlyHMSM(0u, 0u, 0u, 10u, OS_OPT_TIME_HMSM_STRICT, &err);
@@ -394,6 +427,10 @@ static void SD_Task(void *p_arg) {
 
     while (1) {
         // SD
+        if(playingFlag){
+            // leer datos del archivo actual en SD
+            // llenar buffers de audio y ledMatrix
+        }
 
         OSTimeDlyHMSM(0u, 0u, 0u, 200u, OS_OPT_TIME_HMSM_STRICT, &err);
     }
