@@ -6,9 +6,9 @@
 #include "encoder.h"
 
 void encoderInit(void) {
-    gpioMode(PIN_ENCODER_A, INPUT_PULLUP);
-    gpioMode(PIN_ENCODER_B, INPUT_PULLUP);
-    gpioMode(PIN_ENCODER_SWITCH, INPUT_PULLUP);
+    gpioMode(PIN_ENCODER_A, INPUT);
+    gpioMode(PIN_ENCODER_B, INPUT);
+    gpioMode(PIN_ENCODER_SWITCH, INPUT);
 
     bool a = gpioRead(PIN_ENCODER_A);
     bool b = gpioRead(PIN_ENCODER_B);

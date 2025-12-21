@@ -66,7 +66,7 @@ static void ws2_dump_ftm_dma(void);
 #define LEDMATRIX_TASK_PRIO       6u
 
 // stack sizes (check this values)
-#define MAIN_STK_SIZE               256u
+#define MAIN_STK_SIZE               1024u
 #define AUDIO_STK_SIZE              256u
 #define SD_STK_SIZE                 512u
 #define DISP_STK_SIZE               2048u
@@ -131,6 +131,7 @@ static void SD_Task(void *p_arg);
 
 void App_Init(void)
 {
+    // OS Task creation & init
     App_TaskCreate();
 }
 
@@ -152,10 +153,10 @@ static void App_TaskCreate(void)
 	                "LedFrameSem",
 	                0u,                     // empieza en 0 → nadie pasa hasta el 1er PIT
 	                &err);
-    // OSSemCreate(&DisplaySem,
-    //                 "Display semaphore",
-    //                 0u,
-    //                 &err);
+    OSSemCreate(&DisplaySem,
+                    "Display semaphore",
+                    0u,
+                    &err);
 
     // Create tasks                
     OSTaskCreate(&MainTCB,
@@ -231,45 +232,38 @@ static void Main_Task(void *p_arg)
     (void)p_arg;
     OS_ERR err;
 
+    // Drivers initialization
     init_LCD();
+    encoderInit();
     init_user_buttons();
-    // SIM->SCGC5 |= SIM_SCGC5_PORTE_MASK;
+
+    write_LCD("Welcome!", 0);
+    OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
 
     gpioMode(PIN_LED_BLUE, OUTPUT);
-    gpioWrite(PIN_LED_BLUE, 0);
+    gpioWrite(PIN_LED_BLUE, 1);
     gpioMode(PIN_LED_GREEN, OUTPUT);
-    gpioWrite(PIN_LED_GREEN, 0);
+    gpioWrite(PIN_LED_GREEN, 1);
     gpioMode(PIN_LED_RED, OUTPUT);
-    gpioWrite(PIN_LED_RED, 0);
+    gpioWrite(PIN_LED_RED, 1);
     gpioMode(PORTNUM2PIN(PE, 25), OUTPUT);
 
     while (1)
     {
-        // Display
-        if(get_BTN_state(PLAY_BTN))
-            gpioToggle(PORTNUM2PIN(PE, 25));
-            // write_LCD("Play btn", 0);
-        else if(get_BTN_state(NEXT_BTN))
-            // write_LCD("next btn", 0);
-            gpioToggle(PIN_LED_RED);
-        else if(get_BTN_state(PREV_BTN))
-            // write_LCD("next btn", 0);
-            gpioToggle(PIN_LED_GREEN);
-
-        OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
-
         /****************************************** BUTTON EVENTS ******************************************/ 
-        if(get_BTN_state(PLAY_BTN)) {
-            switch (currentState) {
-            case APP_STATE_PLAYING:
-                currentEvent = APP_EVENT_PAUSE;
-                break;
-            case APP_STATE_PAUSED:
-                currentEvent = APP_EVENT_PLAY;
-                break;
-            default:
-                currentEvent = APP_EVENT_NONE;
-                break;
+        if(get_BTN_state(PLAY_BTN))
+        {
+            switch (currentState)
+            {
+                case APP_STATE_PLAYING:
+                    currentEvent = APP_EVENT_PAUSE;
+                    break;
+                case APP_STATE_PAUSED:
+                    currentEvent = APP_EVENT_PLAY;
+                    break;
+                default:
+                    currentEvent = APP_EVENT_NONE;
+                    break;
             }
         }
         else if(get_BTN_state(NEXT_BTN))
@@ -280,11 +274,14 @@ static void Main_Task(void *p_arg)
         /**************************************************************************************************/ 
         
         /**************************************** ENCODER EVENTS ******************************************/
-        if(getTurns() > 0) currentEvent = APP_EVENT_ENC_RIGHT;
-        else if(getTurns() < 0) currentEvent = APP_EVENT_ENC_LEFT;
-        else if(getSwitchState() == BTN_CLICK) currentEvent = APP_EVENT_ENC_BUTTON;
-        else if(getSwitchState() == BTN_LONG_CLICK) currentEvent = APP_EVENT_ENC_BUTTON;
-        else currentEvent = APP_EVENT_NONE;
+        if(getTurns() > 0) 
+            currentEvent = APP_EVENT_ENC_RIGHT;
+        if(getTurns() < 0) 
+            currentEvent = APP_EVENT_ENC_LEFT;
+        if(getSwitchState() == BTN_CLICK) 
+            currentEvent = APP_EVENT_ENC_BUTTON;
+        if(getSwitchState() == BTN_LONG_CLICK) 
+            currentEvent = APP_EVENT_ENC_BUTTON;
         /**************************************************************************************************/
 
         switch (currentState){
@@ -293,6 +290,7 @@ static void Main_Task(void *p_arg)
                 // escribir cosas en el display
 
                 if(currentEvent == APP_EVENT_ENC_BUTTON){
+                    OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                     // guardar referencia a la canción que va a empezar a reproducir (SD)
                     // empezar transferencia SD → audio (SD decoder + audio + ledMatrix)
                     
@@ -301,12 +299,14 @@ static void Main_Task(void *p_arg)
                     currentEvent = APP_EVENT_NONE;
                 }
                 else if(currentEvent == APP_EVENT_ENC_RIGHT){
+                    OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                     // actualiza display con la siguiente cancion
                     // puntero a la siguiente cancion
                     // SD browsing (metadata)
                     currentEvent = APP_EVENT_NONE;
                 }
                 else if(currentEvent == APP_EVENT_ENC_LEFT){
+                    OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                     // actualiza display con la cancion anterior
                     // puntero a la cancion anterior
                     // SD browsing (metadata)
@@ -317,16 +317,19 @@ static void Main_Task(void *p_arg)
         	case APP_STATE_PLAYING:
                 /* coming soon... */                
                 if(currentEvent == APP_EVENT_NEXT_TRACK){
+                    OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                     // empezar a reproducir el siguiente track
                     currentEvent = APP_EVENT_NONE;
                 }
-                if(currentEvent == APP_EVENT_PREV_TRACK){
+                else if(currentEvent == APP_EVENT_PREV_TRACK){
+                    OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                     // empezar a reproducir el track anterior
                     currentEvent = APP_EVENT_NONE;
                 }
 
                 // transitions between states
         		if(currentEvent == APP_EVENT_PAUSE){
+                    OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                     // pausar transferencia SD → audio (SD decoder + audio + ledMatrix)
                     // actualiza display para mostrar estado de pausa
                     playingFlag = false;
@@ -336,6 +339,7 @@ static void Main_Task(void *p_arg)
                 if(currentEvent == APP_EVENT_ENC_BUTTON ||
                    currentEvent == APP_EVENT_ENC_LEFT ||
                    currentEvent == APP_EVENT_ENC_RIGHT){
+                    OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                     // pausar transferencia SD → audio (SD decoder + audio + ledMatrix)
                     // actualiza display con el menu
                     // puntero a la cancion anterior
@@ -348,6 +352,7 @@ static void Main_Task(void *p_arg)
         	case APP_STATE_PAUSED:
                 // transitions between states
         		if(currentEvent == APP_EVENT_PLAY){
+                    OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                     // empezar transferencia SD → audio desde donde quedo (SD decoder + audio + ledMatrix)
                     // actualiza display para mostrar estado de playing
                     playingFlag = true;
@@ -357,6 +362,7 @@ static void Main_Task(void *p_arg)
                 if(currentEvent == APP_EVENT_ENC_BUTTON ||
                    currentEvent == APP_EVENT_ENC_LEFT ||
                    currentEvent == APP_EVENT_ENC_RIGHT){
+                    OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                     // ir a seleccion de track
                     playingFlag = false;
                     currentState = APP_STATE_SELECT_TRACK;
@@ -378,6 +384,8 @@ static void Main_Task(void *p_arg)
                 */
         		break;
         }
+        OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
+
     }
 }
 
@@ -400,19 +408,18 @@ static void Audio_Task(void *p_arg)
     {
         // buttons state / debounce
 
-        // if (isPlaying)
-        // {
+        if (playingFlag)
+        {
             Audio_Service();
 
-            if(PIT_trigger){
+            if(PIT_trigger)
+            {
                 PIT_trigger = false;
             }
-            if(DMA_trigger){
+            if(DMA_trigger)
+            {
                 DMA_trigger = false;
             }
-
-        if(playingFlag){
-
         }
 
         OSTimeDlyHMSM(0u, 0u, 0u, 10u, OS_OPT_TIME_HMSM_STRICT, &err);
@@ -427,7 +434,27 @@ static void Display_Task(void *p_arg)
     while (1) {
         // Display
     	OSSemPend(&DisplaySem, 0u, OS_OPT_PEND_BLOCKING, 0u, &err);
-
+        switch(currentState) {
+            case(APP_STATE_PLAYING):
+                write_LCD("Playing", 0);
+                break;
+            case(APP_STATE_PAUSED):
+                write_LCD("Paused", 0);
+                break;
+            case(APP_STATE_SELECT_TRACK):
+                write_LCD("Menu", 0);
+                switch(currentEvent) {
+                    case(APP_EVENT_ENC_RIGHT):
+                        write_LCD("Encoder right", 1);
+                        break;
+                    case(APP_EVENT_ENC_LEFT):
+                        write_LCD("Encoder right", 1);
+                        break;
+                    default:
+                }
+                break;
+            default:
+        }
         OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
     }
 }
@@ -582,14 +609,9 @@ int main(void)
     
     OS_CPU_SysTickInit(SystemCoreClock / (uint32_t)OSCfg_TickRate_Hz);
 
-	__disable_irq();
     CPU_Init();
     App_Init();
-
-    __enable_irq();
-
     App_OS_SetAllHooks();
-
 
     OSStart(&err);
 

@@ -59,29 +59,29 @@ void PIT_DisableInterrupt(uint8_t pit){
 }
 
 void PIT0_IRQHandler(void){
+	OSIntEnter();
 	PIT->CHANNEL[0].TFLG = PIT_TFLG_TIF_MASK;
 	PIT_Callbacks[0]();
+	OSIntExit();
 }
 
 void PIT1_IRQHandler(void){
+	OSIntEnter();
 	PIT->CHANNEL[1].TFLG = PIT_TFLG_TIF_MASK;
 	PIT_Callbacks[1]();
+	OSIntExit();
 }
 
 void PIT2_IRQHandler(void){
+	OSIntEnter();
 	PIT->CHANNEL[2].TFLG = PIT_TFLG_TIF_MASK;
 	PIT_Callbacks[2]();
+	OSIntExit();
 }
 
 void PIT3_IRQHandler(void){
+	OSIntEnter();
 	PIT->CHANNEL[3].TFLG = PIT_TFLG_TIF_MASK;
 	PIT_Callbacks[3]();
+	OSIntExit();
 }
-
-void PIT4_IRQHandler(void){
-	PIT->CHANNEL[4].TFLG = PIT_TFLG_TIF_MASK;
-	PIT_Callbacks[4]();
-}
-
-
-

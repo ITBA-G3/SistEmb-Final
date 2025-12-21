@@ -6,6 +6,9 @@
 
 #include "LCD.h"
 
+static volatile uint32_t TICKS_DELAY_MS = 0;
+
+static void delay_cb(void);
 static void delay_ms(uint32_t ms);
 
 typedef struct {
@@ -17,8 +20,11 @@ display_t LCD = {{NULL, NULL}, {0, 0}};
 
 void init_LCD (void)
 {
-    init_I2C();
+    gpioMode(PORTNUM2PIN(PE,24), OUTPUT); 
 
+    init_I2C();
+    PIT_Init(PIT_3, PIT_TIME(1000)); // 1ms tick
+    PIT_SetCallback(delay_cb, PIT_3);
     delay_ms(40);
 
     uint8_t payload = (uint8_t)(1<<3);
@@ -188,7 +194,7 @@ void clear_LCD()
     const uint8_t data=0b00000001;
     write_byte(data, 0, 0);
 
-    delay_ms(4);    
+    // delay_ms(4);    
 }
 
 void clear_line(uint8_t line)
@@ -199,11 +205,16 @@ void clear_line(uint8_t line)
     set_cursor_line(line);
 }
 
-static void delay_ms(uint32_t ms)
+static void delay_cb(void)
 {
-   for (uint32_t i = 0; i < ms; ++i) 
-       for (uint32_t j = 0; j < 3000U; ++j) 
-           ;
+    TICKS_DELAY_MS++;
+    gpioToggle(PORTNUM2PIN(PE,24));
 }
 
+static void delay_ms(uint32_t ms)
+{
+    TICKS_DELAY_MS = 0;
+    while (TICKS_DELAY_MS < ms);
+
+}
 
