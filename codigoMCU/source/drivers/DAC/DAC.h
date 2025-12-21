@@ -13,8 +13,6 @@
 #define QSIZE 254
 #define QOVERFLOW 0xFF
 
-
-
 typedef DAC_Type *DAC_t;
 typedef uint16_t DACData_t;
 

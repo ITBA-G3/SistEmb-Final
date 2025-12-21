@@ -15,13 +15,14 @@
 
 #include "Audio.h"
 
-//#include "App.h"
 #include "os.h"
 #include "cpu.h"
 #include "board.h"
 #include "drivers/TICKS/ticks.h"
 #include "MK64F12.h"
 #include "drivers/gpio.h"
+#include "BTN/BTN.h"
+#include "drivers/LCD/LCD.h"
 
 #include <stdio.h>
 #include <stdint.h>
@@ -49,7 +50,7 @@ static void PIT_cb(void);
  * CONSTANT AND MACRO DEFINITIONS USING #DEFINE
  ******************************************************************************/
 #ifndef SystemCoreClock
-#define SystemCoreClock 120000000U
+// #define SystemCoreClock 120000000U
 #endif
 
 // task priorities 
@@ -107,8 +108,6 @@ static void SD_Task(void *p_arg);
 void App_Init(void)
 {
     App_TaskCreate();
-
-
 }
 
 void App_Run(void)
@@ -129,13 +128,12 @@ static void App_TaskCreate(void)
 	                "LedFrameSem",
 	                0u,                     // empieza en 0 → nadie pasa hasta el 1er PIT
 	                &err);
-    OSSemCreate(&DisplaySem,
-                    "Display semaphore",
-                    0u,
-                    &err);
+    // OSSemCreate(&DisplaySem,
+    //                 "Display semaphore",
+    //                 0u,
+    //                 &err);
 
     // Create tasks                
-
     OSTaskCreate(&MainTCB,
                  "Main Task",
                  Main_Task,
@@ -149,7 +147,6 @@ static void App_TaskCreate(void)
                  0u,
                  OS_OPT_TASK_STK_CHK,
                  &err);
-//
     OSTaskCreate(&AudioTCB,
                  "Audio Task",
                  Audio_Task,
@@ -163,8 +160,6 @@ static void App_TaskCreate(void)
                  0u,
                  OS_OPT_TASK_STK_CHK,
                  &err);
-
-
     OSTaskCreate(&DispTCB,
                  "Display Task",
                  Display_Task,
@@ -178,7 +173,6 @@ static void App_TaskCreate(void)
                  0u,
                  OS_OPT_TASK_STK_CHK,
                  &err);
-
     OSTaskCreate(&LedTCB,
                  "LedMatrix Task",
                  LedMatrix_Task,
@@ -190,9 +184,8 @@ static void App_TaskCreate(void)
                  0u,
                  0u,
                  0u,
-				 OS_OPT_TASK_STK_CHK | OS_OPT_TASK_SAVE_FP,
+     OS_OPT_TASK_STK_CHK | OS_OPT_TASK_SAVE_FP,
                  &err);
-
     OSTaskCreate(&SdTCB,
                  "SD Task",
                  SD_Task,
@@ -214,10 +207,33 @@ static void Main_Task(void *p_arg)
     (void)p_arg;
     OS_ERR err;
 
-    while (1) {
-        // Display
+    init_LCD();
+    init_user_buttons();
 
-        OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
+    gpioMode(PORTNUM2PIN(PE, 25), OUTPUT);
+
+    while (1)
+    {
+        gpioToggle(PIN_LED_BLUE);
+        // Display
+        if(get_BTN_state(PLAY_BTN))
+            gpioToggle(PIN_LED_BLUE);
+            // write_LCD("Play btn", 0);
+        else if(get_BTN_state(NEXT_BTN))
+            // write_LCD("next btn", 0);
+            gpioToggle(PIN_LED_RED);
+        else if(get_BTN_state(PREV_BTN))
+            // write_LCD("next btn", 0);
+            gpioToggle(PIN_LED_GREEN);
+
+        OSTimeDlyHMSM(0u, 0u, 0u, 500u, OS_OPT_TIME_HMSM_STRICT, &err);
+        if (err != OS_ERR_NONE) {
+        // señal dura de error
+        while (1) {
+            gpioToggle(PIN_LED_RED);
+            for (volatile int i=0;i<200000;i++);
+        }
+    }
     }
 }
 
@@ -234,9 +250,10 @@ static void Audio_Task(void *p_arg)
 	PORTB->PCR[2] = 0;   // adjust pin number to your board
 
 	Audio_Init();
-	__enable_irq();
+    
 
-    while (1) {
+    while (1)
+    {
         // buttons state / debounce
 
         // if (isPlaying)
@@ -289,7 +306,8 @@ static void LedMatrix_Task(void *p_arg)
 
 	LEDM_SetBrightness(matrix, 8);
 
-    while (1) {
+    while (1)
+    {
         // LED matrix
     	// LED MATRIX TEST
 
@@ -386,6 +404,7 @@ static void PIT_cb(void)
 
 int main(void)
 {
+
     OS_ERR err;
 
 #if (CPU_CFG_NAME_EN == DEF_ENABLED)
@@ -393,15 +412,24 @@ int main(void)
 #endif
 
     hw_Init();
+    NVIC_DisableIRQ(UART1_ERR_IRQn);
+    NVIC_ClearPendingIRQ(UART1_ERR_IRQn);
+
+
     OSInit(&err);
 #if OS_CFG_SCHED_ROUND_ROBIN_EN > 0u
     /* Enable task round robin. */
     OSSchedRoundRobinCfg((CPU_BOOLEAN)1, 0, &err);
 #endif
+    extern uint32_t SystemCoreClock;
+    
     OS_CPU_SysTickInit(SystemCoreClock / (uint32_t)OSCfg_TickRate_Hz);
 
+	__disable_irq();
     CPU_Init();
     App_Init();
+
+    __enable_irq();
 
     App_OS_SetAllHooks();
     OSStart(&err);
