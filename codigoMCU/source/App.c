@@ -23,6 +23,7 @@
 #include "drivers/gpio.h"
 #include "BTN/BTN.h"
 #include "drivers/LCD/LCD.h"
+#include "drivers/Encoder/encoder.h"
 
 #include <stdio.h>
 #include <stdint.h>
