@@ -7,6 +7,11 @@
 #define DAC_H_
 
 #include "hardware.h"
+#include "MK64F12.h"
+
+#define DAC_DATL_DATA0_WIDTH 8
+#define QSIZE 254
+#define QOVERFLOW 0xFF
 
 typedef DAC_Type *DAC_t;
 typedef uint16_t DACData_t;

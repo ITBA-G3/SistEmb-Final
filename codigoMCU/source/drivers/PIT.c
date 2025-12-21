@@ -58,16 +58,30 @@ void PIT_DisableInterrupt(uint8_t pit){
 	PIT ->CHANNEL[pit].TCTRL &= ~PIT_TCTRL_TIE_MASK;
 }
 
-void PIT1_IRQHandler(void){
-	OSIntEnter();                      // tell µC/OS we are in an ISR
-	PIT->CHANNEL[1].TFLG = PIT_TFLG_TIF_MASK;
-	PIT_Callbacks[1]();
-	OSIntExit();                       // allow scheduler to run
-}
-
 void PIT0_IRQHandler(void){
-	OSIntEnter();                      // tell µC/OS we are in an ISR
 	PIT->CHANNEL[0].TFLG = PIT_TFLG_TIF_MASK;
 	PIT_Callbacks[0]();
-	OSIntExit();                       // allow scheduler to run
 }
+
+void PIT1_IRQHandler(void){
+	PIT->CHANNEL[1].TFLG = PIT_TFLG_TIF_MASK;
+	PIT_Callbacks[1]();
+}
+
+void PIT2_IRQHandler(void){
+	PIT->CHANNEL[2].TFLG = PIT_TFLG_TIF_MASK;
+	PIT_Callbacks[2]();
+}
+
+void PIT3_IRQHandler(void){
+	PIT->CHANNEL[3].TFLG = PIT_TFLG_TIF_MASK;
+	PIT_Callbacks[3]();
+}
+
+void PIT4_IRQHandler(void){
+	PIT->CHANNEL[4].TFLG = PIT_TFLG_TIF_MASK;
+	PIT_Callbacks[4]();
+}
+
+
+

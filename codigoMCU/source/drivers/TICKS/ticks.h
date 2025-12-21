@@ -17,13 +17,17 @@
 /*******************************************************************************
  * CONSTANT AND MACRO DEFINITIONS USING #DEFINE
  ******************************************************************************/
+
 #define MAX_FUNCTIONS 20
+
+typedef void (*pisr_cb_t)(void);
+
 /*
  * @brief carga funcion a ejecutarse en cada tick
  * @param funcallback Function to be call every tick
  * @return registration succeed
  */
-bool tickAdd (pinIrqFun_t funcallback, unsigned int period);
+bool tickAdd (pisr_cb_t funcallback, unsigned int period);
 
 /*
  * @brief llama a todas las callback de tick
