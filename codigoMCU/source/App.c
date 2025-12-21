@@ -409,38 +409,31 @@ static void LedMatrix_Task(void *p_arg)
 
     //	LEDMATRIX TEST
 	matrix = LEDM_Init(8, 8);
-
 	FFT_Init();
 	PIT_Init(PIT_0, 10);		// PIT 0 para controlar FPS y refrescar matrix de leds,
 	PIT_SetCallback(PIT_cb, PIT_0);
 
+	// For debugging
 	gpioMode(PORTNUM2PIN(PC,10), OUTPUT);
 	gpioWrite(PORTNUM2PIN(PC,10), 1);
 	gpioMode(PORTNUM2PIN(PC,11), OUTPUT);
-	gpioWrite(PORTNUM2PIN(PC,11), 1);
-
+	gpioWrite(PORTNUM2PIN(PC,11), 0);
 
     static int16_t frame[FFT_N];
 	static float bands[8];
 
-
-    while (1)
-    {
-        // LED matrix
-    	// LED MATRIX TEST
-
-
+    while (1) {
     	OSSemPend(&LedFrameSem, 0u, OS_OPT_PEND_BLOCKING, 0u, &err);
 
 		LEDM_SetBrightness(matrix, 2);
 
+		// FOR TESTING
 		make_test_pcm(frame, AUDIO_FS_HZ);
-//
-		FFT_ComputeBands(frame, FFT_N, AUDIO_FS_HZ, bands);
-//    	gpioToggle(PORTNUM2PIN(PC,10));
 
-		Visualizer_UpdateFrame(matrix);
-//		Visualizer_DrawBars(bands, matrix);
+		FFT_ComputeBands(frame, FFT_N, AUDIO_FS_HZ, bands);
+
+//		Visualizer_UpdateFrame(matrix);
+		Visualizer_DrawBars(bands, matrix);
 
 		bool ok = LEDM_Show(matrix);
 
@@ -449,12 +442,6 @@ static void LedMatrix_Task(void *p_arg)
 			    OSTimeDly(5u, OS_OPT_TIME_DLY, &err);
 			}
 		}
-
-//        OSTimeDlyHMSM(0u, 0u, 0u, 5u, OS_OPT_TIME_HMSM_STRICT, &err);
-
-		LEDM_Clear(matrix);
-
-
     }
 }
 
@@ -518,7 +505,7 @@ static void PIT_cb(void)
 {
 	OS_ERR err;
 	OSSemPost(&LedFrameSem, OS_OPT_POST_1, &err);
-	gpioToggle(PORTNUM2PIN(PC,11));
+//	gpioToggle(PORTNUM2PIN(PC,11));
 }
 
 
@@ -537,8 +524,6 @@ static void ws2_dump_ftm_dma(void)
 
     (void)ftm_sc; (void)ftm_mod; (void)ftm_c0sc; (void)ftm_c0v;
     (void)erq; (void)mux0; (void)citer; (void)biter; (void)csr;
-
-    // breakpoint here
 }
 
 /********************************

@@ -173,19 +173,18 @@ void DMA_ClearChannelIntFlag(DMAChannel_t channel) {
 void DMA0_IRQHandler(){
 	OSIntEnter();
 	gpioToggle(PORTNUM2PIN(PC,10));
-	// Check channel 0
+
 	if (DMA0->INT & (1u << 0)) {
+		DMA_ClearChannelDoneFlag(DMA_CH0);
 		DMA_ClearChannelIntFlag(DMA_CH0);
 		if (callback[0]) callback[0]();
 	}
-
-
 	OSIntExit();
 }
 
 void DMA1_IRQHandler(){
-	// Check channel 1
 	OSIntEnter();
+
 	if (DMA0->INT & (1u << 1)) {
 		DMA_ClearChannelDoneFlag(DMA_CH1);
 		DMA_ClearChannelIntFlag(DMA_CH1);
