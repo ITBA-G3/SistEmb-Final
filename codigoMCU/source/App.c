@@ -28,6 +28,13 @@
 // #include <stdbool.h>
 #include <math.h>
 #include "hardware.h"
+//FAT
+#include "drivers/SDHC/sdhc.h"
+#include "drivers/FAT/ff.h"
+#include "drivers/FAT/diskio.h"
+//MP3
+#include "helix/pub/mp3dec.h"
+#include "mp3_player.h"
 
 // AUDIO
 volatile bool PIT_trigger;
@@ -45,6 +52,16 @@ static volatile bool start_new_frame;
 static void make_test_pcm(int16_t *pcm, uint32_t fs_hz);
 static void PIT_cb(void);
 static void ws2_dump_ftm_dma(void);
+
+// FAT
+#ifndef MAX_LISTED_ENTRIES
+#define MAX_LISTED_ENTRIES 64
+#endif
+
+#ifndef MAX_NAME_LEN
+#define MAX_NAME_LEN 64     // suficiente para pruebas; si querés LFN largo, subilo
+#endif
+
 
 /*******************************************************************************
  * CONSTANT AND MACRO DEFINITIONS USING #DEFINE
@@ -320,17 +337,48 @@ static void LedMatrix_Task(void *p_arg)
     }
 }
 
+
+
+static FATFS g_fs;
+static FIL   g_song;
+
 static void SD_Task(void *p_arg)
 {
     (void)p_arg;
     OS_ERR err;
 
-    while (1) {
-        // SD
+    // 1) SDHC init (igual que antes)
+    sdhc_enable_clocks_and_pins();
+    sdhc_reset(SDHC_RESET_CMD);
+    sdhc_reset(SDHC_RESET_DATA);
+    __enable_irq();
 
-        OSTimeDlyHMSM(0u, 0u, 0u, 200u, OS_OPT_TIME_HMSM_STRICT, &err);
+    // 2) Montar FS
+    FRESULT fr = f_mount(&g_fs, "0:", 1);
+    if (fr != FR_OK) {
+        // Si falla, quedate vivo (sin printf)
+        while (1) OSTimeDly(10u, OS_OPT_TIME_DLY, &err);
+    }
+
+    // 3) Abrir MP3
+    fr = f_open(&g_song, "0:/TALKTO~1.MP3", FA_READ);
+    if (fr != FR_OK) {
+        while (1) OSTimeDly(10u, OS_OPT_TIME_DLY, &err);
+    }
+
+    // 4) Inicializar Helix + buffers del player
+    if (!MP3Player_InitWithOpenFile(&g_song)) {
+        while (1) OSTimeDly(10u, OS_OPT_TIME_DLY, &err);
+    }
+
+    // 5) A partir de acá, el audio task puede ir pidiendo samples.
+    // Si querés, podés dormir esta task.
+    while (1) {
+        OSTimeDlyHMSM(0u,0u,1u,0u, OS_OPT_TIME_HMSM_STRICT, &err);
     }
 }
+
+
 
 static void make_test_pcm(int16_t *pcm, uint32_t fs_hz)
 {

@@ -20,6 +20,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "mp3_player.h"
 
 // Internal states
 static volatile uint16_t *g_playing = NULL;     // buffer DMA is currently playing
@@ -171,7 +172,9 @@ void Audio_Service(void)
 
     if (!dst) return;
 
-    Audio_FillSine(dst, AUDIO_BUF_LEN);
+//    Audio_FillSine(dst, AUDIO_BUF_LEN);
+    MP3Player_FillDacBuffer(dst, AUDIO_BUF_LEN);
+
 }
 
 /**
