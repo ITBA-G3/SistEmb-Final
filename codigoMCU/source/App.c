@@ -104,6 +104,8 @@ static OS_MUTEX AppMtx;     /* Application state mutex */
 
 static OS_SEM DisplaySem;
 static OS_SEM LedFrameSem;
+static OS_SEM g_mp3ReadySem;        // 
+
 
 /*******************************************************************************
  * FUNCTION PROTOTYPES FOR PRIVATE FUNCTIONS WITH FILE LEVEL SCOPE
@@ -151,6 +153,8 @@ static void App_TaskCreate(void)
                     "Display semaphore",
                     0u,
                     &err);
+
+    OSSemCreate(&g_mp3ReadySem, "mp3_ready", 0, &err);
 
     // Create tasks                
 
@@ -254,11 +258,14 @@ static void Audio_Task(void *p_arg)
 	Audio_Init();
 	__enable_irq();
 
+    OSSemPend(&g_mp3ReadySem, 0, OS_OPT_PEND_BLOCKING, NULL, &err);
     while (1) {
         // buttons state / debounce
 
         // if (isPlaying)
         // {
+            
+
             Audio_Service();
 
             if(PIT_trigger){
@@ -313,13 +320,12 @@ static void LedMatrix_Task(void *p_arg)
 
 		LEDM_SetBrightness(matrix, 2);
 
-		make_test_pcm(frame, AUDIO_FS_HZ);
+//		make_test_pcm(frame, AUDIO_FS_HZ);
+        MP3Player_GetLastPCMwindow(frame, FFT_N);
 //
 		FFT_ComputeBands(frame, FFT_N, AUDIO_FS_HZ, bands);
-//    	gpioToggle(PORTNUM2PIN(PC,10));
 
-		Visualizer_UpdateFrame(matrix);
-//		Visualizer_DrawBars(bands, matrix);
+		Visualizer_DrawBars(bands, matrix);
 
 		bool ok = LEDM_Show(matrix);
 
@@ -328,12 +334,6 @@ static void LedMatrix_Task(void *p_arg)
 			    OSTimeDly(5u, OS_OPT_TIME_DLY, &err);
 			}
 		}
-
-//        OSTimeDlyHMSM(0u, 0u, 0u, 5u, OS_OPT_TIME_HMSM_STRICT, &err);
-
-		LEDM_Clear(matrix);
-
-
     }
 }
 
@@ -371,6 +371,8 @@ static void SD_Task(void *p_arg)
         while (1) OSTimeDly(10u, OS_OPT_TIME_DLY, &err);
     }
 
+    OSSemPost(&g_mp3ReadySem, OS_OPT_POST_1, &err);
+
     // 5) A partir de acá, el audio task puede ir pidiendo samples.
     // Si querés, podés dormir esta task.
     while (1) {
@@ -378,43 +380,6 @@ static void SD_Task(void *p_arg)
     }
 }
 
-
-
-static void make_test_pcm(int16_t *pcm, uint32_t fs_hz)
-{
-    static float ph1 = 0.0f;
-    static float ph2 = 0.0f;
-
-    /* Pick one low-band tone + one mid/high-band tone.
-       Examples for Fs=48k, N=1024 (bin spacing 46.875 Hz):
-       - 281.25 Hz  (k=6)  -> band 250–500
-       - 3000.0 Hz  (k=64) -> band 2000–4000
-    */
-    const float f1 = 281.25f;
-    const float f2 = 3000.0f;
-
-    const float inc1 = 2.0f * (float)M_PI * f1 / (float)fs_hz;
-    const float inc2 = 2.0f * (float)M_PI * f2 / (float)fs_hz;
-
-    /* Keep headroom: sum of two sines can reach 2.0.
-       Using 0.35 + 0.35 keeps peak <= 0.70, no clipping.
-     */
-    const float a1 = 0.35f;
-    const float a2 = 0.35f;
-
-    for (uint32_t i = 0; i < FFT_N; i++) {
-        float s = a1 * sinf(ph1) + a2 * sinf(ph2);
-
-        // Optional hard clip (should never trigger with the amplitudes above)
-        if (s >  1.0f) s =  1.0f;
-        if (s < -1.0f) s = -1.0f;
-
-        pcm[i] = (int16_t)(s * 32767.0f);
-
-        ph1 += inc1; if (ph1 >= 2.0f*(float)M_PI) ph1 -= 2.0f*(float)M_PI;
-        ph2 += inc2; if (ph2 >= 2.0f*(float)M_PI) ph2 -= 2.0f*(float)M_PI;
-    }
-}
 
 /********************************
  *      PIT CALLBACKS

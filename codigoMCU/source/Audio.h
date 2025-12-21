@@ -30,7 +30,7 @@
 #include "drivers/DMA/DMA.h"
 #include "drivers/DAC/DAC.h"
 
-#define AUDIO_FS_HZ     48000u      // sample rate
+#define AUDIO_FS_HZ     44100u      // sample rate
 #define SINE_FREQ_HZ    1000u       // 1 kHz test tone
 #define AUDIO_BUF_LEN   512u        // must match DMA major loop
 #define DAC_BITS        12u

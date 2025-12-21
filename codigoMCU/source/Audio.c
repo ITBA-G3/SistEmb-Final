@@ -45,10 +45,8 @@ static void Audio_FillSine(volatile uint16_t *dst, uint32_t n);
 static void AudioDMA_cb(void){
 	DMA_trigger = true;
 
-	// 1) Disable further requests while reprogramming
-	DMA_SetEnableRequest(DMA_CH1, false);          // or clear ERQ for that channel
+	DMA_SetEnableRequest(DMA_CH1, false);          // clear ERQ for that channel
 
-	// 2) Clear interrupt flags / DONE (API depends on your driver)
 	DMA_ClearChannelIntFlag(DMA_CH1);
 
     volatile uint16_t *just_finished = g_playing;
@@ -60,9 +58,6 @@ static void AudioDMA_cb(void){
 
     DMA_SetCurrMajorLoopCount(DMA_CH1, AUDIO_BUF_LEN);	    // Reset loop counts for the new major loop
     DMA_SetStartMajorLoopCount(DMA_CH1, AUDIO_BUF_LEN);
-
-
-//    DMA_SetSourceLastAddrOffset(DMA_CH1, -(int32_t)(2 * AUDIO_BUF_LEN));    // Source wraps back to the start at the end of the major loop
 
     DMA_SetEnableRequest(DMA_CH1, true);
 
@@ -104,8 +99,8 @@ void Audio_Init(void)
 
 
     // Pre-fill both buffers before starting DMA
-	Audio_FillSine(bufA, AUDIO_BUF_LEN);
-	Audio_FillSine(bufB, AUDIO_BUF_LEN);
+	// Audio_FillSine(bufA, AUDIO_BUF_LEN);
+	// Audio_FillSine(bufB, AUDIO_BUF_LEN);
 
 	g_playing   = bufA;
 	g_fill_next = bufB;
@@ -169,12 +164,11 @@ void Audio_Service(void)
         g_need_fill = false; // consume the request
     }
     __enable_irq();
-
+    
     if (!dst) return;
 
-//    Audio_FillSine(dst, AUDIO_BUF_LEN);
     MP3Player_FillDacBuffer(dst, AUDIO_BUF_LEN);
-
+//  //   Audio_FillSine(dst, AUDIO_BUF_LEN);
 }
 
 /**

@@ -17,3 +17,4 @@ void MP3Player_FillDacBuffer(volatile uint16_t *dst, uint32_t n);
 // Opcional para el próximo paso (timing correcto)
 uint32_t MP3Player_GetSampleRateHz(void);
 uint32_t MP3Player_GetChannels(void);
+void MP3Player_GetLastPCMwindow(int16_t *pcm, uint32_t max_samples);

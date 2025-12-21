@@ -76,9 +76,10 @@ static bool mp3_fill_inbuf(void)
 
     UINT br = 0;
     uint32_t space = (uint32_t)MP3_INBUF_SZ - (uint32_t)g_bytes_left;
+    space &= ~(uint32_t)0x1FF;   // múltiplo de 512
     if (space == 0) return true;
-
-    if (f_read(g_fp, &g_inbuf[g_bytes_left], (UINT)space, &br) != FR_OK) {
+    FRESULT fr = f_read(g_fp, &g_inbuf[g_bytes_left], (UINT)space, &br);
+    if (fr != FR_OK) {
         return false;
     }
     g_bytes_left += (int)br;
@@ -189,6 +190,20 @@ void MP3Player_FillDacBuffer(volatile uint16_t *dst, uint32_t n)
         }
 
         dst[out++] = pcm16_to_dac(mono);
+    }
+}
+
+MP3Player_GetLastPCMwindow(int16_t *pcm, uint32_t max_samples)
+{
+    if (!pcm || max_samples == 0) return 0;
+
+    uint32_t to_copy = (uint32_t)g_pcm_total;
+    if (to_copy > max_samples) {
+        to_copy = max_samples;
+    }
+
+    for (uint32_t i = 0; i < to_copy; i++) {
+        pcm[i] = g_pcm[i];
     }
 }
 
