@@ -5,12 +5,7 @@
   ******************************************************************************/
 
 #include "DAC.h"
-#include "../pisr.h"
-#include "MK64F12.h"
 
-#define DAC_DATL_DATA0_WIDTH 8
-#define QSIZE 254
-#define QOVERFLOW 0xFF
 static unsigned char DACbuffer[QSIZE]; 
 static uint16_t news;         
 static unsigned char *pin, *pout;   

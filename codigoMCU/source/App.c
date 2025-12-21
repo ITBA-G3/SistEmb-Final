@@ -15,17 +15,18 @@
 
 #include "Audio.h"
 
-
-//#include "App.h"
 #include "os.h"
 #include "cpu.h"
 #include "board.h"
-#include "ticks.h"
+#include "drivers/TICKS/ticks.h"
 #include "MK64F12.h"
 #include "drivers/gpio.h"
+#include "BTN/BTN.h"
+#include "drivers/LCD/LCD.h"
 
 #include <stdio.h>
 #include <stdint.h>
+// #include <stdbool.h>
 #include <math.h>
 #include "hardware.h"
 
@@ -33,8 +34,13 @@
 volatile bool PIT_trigger;
 volatile bool DMA_trigger;
 
+//SD
+volatile bool playingFlag = false;
+
 volatile uint16_t bufA[AUDIO_BUF_LEN];
 volatile uint16_t bufB[AUDIO_BUF_LEN];
+
+bool isPlaying = false;
 
 // LED MATRIX
 static LEDM_t *matrix;
@@ -48,7 +54,7 @@ static void ws2_dump_ftm_dma(void);
  * CONSTANT AND MACRO DEFINITIONS USING #DEFINE
  ******************************************************************************/
 #ifndef SystemCoreClock
-#define SystemCoreClock 120000000U
+// #define SystemCoreClock 120000000U
 #endif
 
 // task priorities 
@@ -65,6 +71,25 @@ static void ws2_dump_ftm_dma(void);
 #define DISP_STK_SIZE               2048u
 #define LEDMATRIX_STK_SIZE          2048u
 
+typedef enum {
+    APP_STATE_PLAYING = 0,
+    APP_STATE_PAUSED,
+    APP_STATE_SELECT_TRACK,
+} controlState_t;
+static controlState_t currentState = APP_STATE_SELECT_TRACK;
+
+typedef enum {
+    APP_EVENT_NONE = 0,
+    APP_EVENT_PLAY,
+    APP_EVENT_PAUSE,
+    APP_EVENT_ENC_RIGHT,
+    APP_EVENT_ENC_LEFT,
+    APP_EVENT_ENC_BUTTON,
+    APP_EVENT_NEXT_TRACK,
+    APP_EVENT_PREV_TRACK,
+} controlEvent_t ;
+static controlEvent_t currentEvent = APP_EVENT_NONE;
+
 /*******************************************************************************
  * RTOS OBJECTS DECLARATIONS
  ******************************************************************************/
@@ -80,10 +105,10 @@ static OS_TCB SdTCB;
 static OS_TCB DispTCB;
 static OS_TCB LedTCB;
 
-static OS_Q     UiQ;        /* UI event queue */\
+static OS_Q     UiQ;        /* UI event queue */
 static OS_MUTEX AppMtx;     /* Application state mutex */
 
-
+static OS_SEM DisplaySem;
 static OS_SEM LedFrameSem;
 
 /*******************************************************************************
@@ -103,17 +128,18 @@ static void Display_Task(void *p_arg);
 static void LedMatrix_Task(void *p_arg);
 static void SD_Task(void *p_arg);
 
-void App_Init(void) {
+void App_Init(void)
+{
     App_TaskCreate();
+}
 
+void App_Run(void)
+{
 
 }
 
-void App_Run(void) {
-
-}
-
-static void App_TaskCreate(void) {
+static void App_TaskCreate(void)
+{
     OS_ERR err;
 
     // Create RTOS objects
@@ -125,9 +151,12 @@ static void App_TaskCreate(void) {
 	                "LedFrameSem",
 	                0u,                     // empieza en 0 → nadie pasa hasta el 1er PIT
 	                &err);
+    // OSSemCreate(&DisplaySem,
+    //                 "Display semaphore",
+    //                 0u,
+    //                 &err);
 
     // Create tasks                
-
     OSTaskCreate(&MainTCB,
                  "Main Task",
                  Main_Task,
@@ -141,7 +170,6 @@ static void App_TaskCreate(void) {
                  0u,
                  OS_OPT_TASK_STK_CHK,
                  &err);
-//
     OSTaskCreate(&AudioTCB,
                  "Audio Task",
                  Audio_Task,
@@ -155,8 +183,6 @@ static void App_TaskCreate(void) {
                  0u,
                  OS_OPT_TASK_STK_CHK,
                  &err);
-
-
     OSTaskCreate(&DispTCB,
                  "Display Task",
                  Display_Task,
@@ -170,7 +196,6 @@ static void App_TaskCreate(void) {
                  0u,
                  OS_OPT_TASK_STK_CHK,
                  &err);
-
     OSTaskCreate(&LedTCB,
                  "LedMatrix Task",
                  LedMatrix_Task,
@@ -182,9 +207,8 @@ static void App_TaskCreate(void) {
                  0u,
                  0u,
                  0u,
-				 OS_OPT_TASK_STK_CHK | OS_OPT_TASK_SAVE_FP,
+     OS_OPT_TASK_STK_CHK | OS_OPT_TASK_SAVE_FP,
                  &err);
-
     OSTaskCreate(&SdTCB,
                  "SD Task",
                  SD_Task,
@@ -201,19 +225,135 @@ static void App_TaskCreate(void) {
 }
 
 /* TASKS */
-static void Main_Task(void *p_arg) {
+static void Main_Task(void *p_arg)
+{
     (void)p_arg;
     OS_ERR err;
 
-    while (1) {
+    init_LCD();
+    init_user_buttons();
+    // SIM->SCGC5 |= SIM_SCGC5_PORTE_MASK;
+
+    gpioMode(PIN_LED_BLUE, OUTPUT);
+    gpioWrite(PIN_LED_BLUE, 0);
+    gpioMode(PIN_LED_GREEN, OUTPUT);
+    gpioWrite(PIN_LED_GREEN, 0);
+    gpioMode(PIN_LED_RED, OUTPUT);
+    gpioWrite(PIN_LED_RED, 0);
+    gpioMode(PORTNUM2PIN(PE, 25), OUTPUT);
+
+    while (1)
+    {
         // Display
+        if(get_BTN_state(PLAY_BTN))
+            gpioToggle(PORTNUM2PIN(PE, 25));
+            // write_LCD("Play btn", 0);
+        else if(get_BTN_state(NEXT_BTN))
+            // write_LCD("next btn", 0);
+            gpioToggle(PIN_LED_RED);
+        else if(get_BTN_state(PREV_BTN))
+            // write_LCD("next btn", 0);
+            gpioToggle(PIN_LED_GREEN);
 
         OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
+
+
+        switch (currentState){
+        	case APP_STATE_SELECT_TRACK:
+                // falta hacer el menu literalmente, 
+                // escribir cosas en el display
+
+                if(currentEvent == APP_EVENT_ENC_BUTTON){
+                    // guardar referencia a la canción que va a empezar a reproducir (SD)
+                    // empezar transferencia SD → audio (SD decoder + audio + ledMatrix)
+                    
+                    playingFlag = true;
+                    currentState = APP_STATE_PLAYING;
+                    currentEvent = APP_EVENT_NONE;
+                }
+                else if(currentEvent == APP_EVENT_ENC_RIGHT ||
+                        currentEvent == APP_EVENT_NEXT_TRACK){
+                    // actualiza display con la siguiente cancion
+                    // puntero a la siguiente cancion
+                    // SD browsing (metadata)
+                    currentEvent = APP_EVENT_NONE;
+                }
+                else if(currentEvent == APP_EVENT_ENC_LEFT ||
+                        currentEvent == APP_EVENT_PREV_TRACK){
+                    // actualiza display con la cancion anterior
+                    // puntero a la cancion anterior
+                    // SD browsing (metadata)
+                    currentEvent = APP_EVENT_NONE;
+                }
+        		break;
+        	case APP_STATE_PLAYING: //solo espera eventos de pausa o cambio de track   
+        		if(currentEvent == APP_EVENT_PAUSE){
+                    // pausar transferencia SD → audio (SD decoder + audio + ledMatrix)
+                    // actualiza display para mostrar estado de pausa
+                    playingFlag = false;
+        			currentState = APP_STATE_PAUSED;
+        			currentEvent = APP_EVENT_NONE;
+        		}
+                if(currentEvent == APP_EVENT_ENC_BUTTON ||
+                   currentEvent == APP_EVENT_ENC_LEFT ||
+                   currentEvent == APP_EVENT_ENC_RIGHT){
+                    // pausar transferencia SD → audio (SD decoder + audio + ledMatrix)
+                    // actualiza display con el menu
+                    // puntero a la cancion anterior
+                    // SD browsing (metadata)
+                    playingFlag = false;
+                    currentState = APP_STATE_SELECT_TRACK;
+                    currentEvent = APP_EVENT_NONE; //queda esperando alguna accion del encoder
+                }
+                /* coming soon... */
+                /*
+                if(currentEvent == APP_EVENT_NEXT_TRACK){
+                    // empezar a reproducir el siguiente track
+                    currentEvent = APP_EVENT_NONE;
+                }
+                if(currentEvent == APP_EVENT_PREV_TRACK){
+                    // empezar a reproducir el track anterior
+                    currentEvent = APP_EVENT_NONE;
+                }
+                */
+        		break;
+        	case APP_STATE_PAUSED:
+        		if(currentEvent == APP_EVENT_PLAY){
+                    // empezar transferencia SD → audio desde donde quedo (SD decoder + audio + ledMatrix)
+                    // actualiza display para mostrar estado de playing
+                    playingFlag = true;
+        			currentState = APP_STATE_PLAYING;
+        			currentEvent = APP_EVENT_NONE;
+        		}
+                if(currentEvent == APP_EVENT_ENC_BUTTON ||
+                   currentEvent == APP_EVENT_ENC_LEFT ||
+                   currentEvent == APP_EVENT_ENC_RIGHT){
+                    // ir a seleccion de track
+                    playingFlag = false;
+                    currentState = APP_STATE_SELECT_TRACK;
+                    currentEvent = APP_EVENT_NONE;
+                }
+                /* coming soon... */
+                /*
+                if(currentEvent == APP_EVENT_NEXT_TRACK){
+                    // empezar a reproducir el siguiente track
+                    currentState = APP_STATE_PLAYING;
+                    currentEvent = APP_EVENT_NONE;
+                }
+                if(currentEvent == APP_EVENT_PREV_TRACK){
+                    // empezar a reproducir el track anterior
+                    currentState = APP_STATE_PLAYING;
+                    currentEvent = APP_EVENT_NONE;
+                }
+                */
+        		break;
+        }
     }
 }
 
 
-static void Audio_Task(void *p_arg){
+static void Audio_Task(void *p_arg)
+{
     (void)p_arg;
     OS_ERR err;
 
@@ -224,36 +364,46 @@ static void Audio_Task(void *p_arg){
 	PORTB->PCR[2] = 0;   // adjust pin number to your board
 
 	Audio_Init();
-	__enable_irq();
+    
 
-    while (1) {
+    while (1)
+    {
         // buttons state / debounce
 
-    	Audio_Service();
+        // if (isPlaying)
+        // {
+            Audio_Service();
 
-        if(PIT_trigger){
-        	PIT_trigger = false;
-        }
-        if(DMA_trigger){
-        	DMA_trigger = false;
+            if(PIT_trigger){
+                PIT_trigger = false;
+            }
+            if(DMA_trigger){
+                DMA_trigger = false;
+            }
+
+        if(playingFlag){
+
         }
 
         OSTimeDlyHMSM(0u, 0u, 0u, 10u, OS_OPT_TIME_HMSM_STRICT, &err);
     }
 }
 
-static void Display_Task(void *p_arg) {
+static void Display_Task(void *p_arg)
+{
     (void)p_arg;
     OS_ERR err;
 
     while (1) {
         // Display
+    	OSSemPend(&DisplaySem, 0u, OS_OPT_PEND_BLOCKING, 0u, &err);
 
         OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
     }
 }
 
-static void LedMatrix_Task(void *p_arg) {
+static void LedMatrix_Task(void *p_arg)
+{
     (void)p_arg;
     OS_ERR err;
 
@@ -295,12 +445,17 @@ static void LedMatrix_Task(void *p_arg) {
     }
 }
 
-static void SD_Task(void *p_arg) {
+static void SD_Task(void *p_arg)
+{
     (void)p_arg;
     OS_ERR err;
 
     while (1) {
         // SD
+        if(playingFlag){
+            // leer datos del archivo actual en SD
+            // llenar buffers de audio y ledMatrix
+        }
 
         OSTimeDlyHMSM(0u, 0u, 0u, 200u, OS_OPT_TIME_HMSM_STRICT, &err);
     }
@@ -342,7 +497,12 @@ static void make_test_pcm(int16_t *pcm, uint32_t fs_hz)
     }
 }
 
-static void PIT_cb(void){
+/********************************
+ *      PIT CALLBACKS
+ ********************************/
+
+static void PIT_cb(void)
+{
 	OS_ERR err;
 	OSSemPost(&LedFrameSem, OS_OPT_POST_1, &err);
 //	gpioToggle(PORTNUM2PIN(PC,11));
@@ -366,11 +526,15 @@ static void ws2_dump_ftm_dma(void)
     (void)erq; (void)mux0; (void)citer; (void)biter; (void)csr;
 }
 
+/********************************
+ *      MAIN
+ ********************************/
 
 
 
 int main(void)
 {
+
     OS_ERR err;
 
 #if (CPU_CFG_NAME_EN == DEF_ENABLED)
@@ -378,20 +542,21 @@ int main(void)
 #endif
 
     hw_Init();
+
     OSInit(&err);
 #if OS_CFG_SCHED_ROUND_ROBIN_EN > 0u
     /* Enable task round robin. */
     OSSchedRoundRobinCfg((CPU_BOOLEAN)1, 0, &err);
 #endif
+    extern uint32_t SystemCoreClock;
+    
     OS_CPU_SysTickInit(SystemCoreClock / (uint32_t)OSCfg_TickRate_Hz);
 
+	__disable_irq();
     CPU_Init();
     App_Init();
 
-//     OS QUEUES
-//     OSQCreate(&QMagReader, "QMagReader", (OS_MSG_QTY) QUEUE_SIZE, &os_err);
-//     OSQCreate(&QEncoder, "QEncoder", (OS_MSG_QTY) QUEUE_SIZE, &os_err);
-//     OSQCreate(&QDisplay, "QDisplay", (OS_MSG_QTY) QUEUE_SIZE, &os_err);
+    __enable_irq();
 
     App_OS_SetAllHooks();
 
@@ -399,9 +564,7 @@ int main(void)
     OSStart(&err);
 
     /* Should Never Get Here */
-    while (1)
-    {
-    }
+    while (1);
 }
 
 

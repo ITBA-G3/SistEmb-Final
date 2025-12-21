@@ -4,34 +4,6 @@
   @author   Grupo 3
  ******************************************************************************/
 #include "encoder.h"
-#include "drivers/gpio.h"
-#include "drivers/pisr.h"
-#include "source/board.h"
-#include "../SDK/CMSIS/MK64F12.h"
-
-#include <stdbool.h>
-
-/*******************************************************************************
- * CONSTANTS & MACROS
- ******************************************************************************/
-
-// Timing constants
-#define ISR_PERIOD_MS       1
-#define DEBOUNCE_MS         50      // Minimum time to validate a press
-#define LONG_CLICK_MS       1000    // Time threshold for a long click
-
-#define STATE_00    0b00
-#define STATE_01    0b01
-#define STATE_10    0b10
-#define STATE_11    0b11
-
-static uint8_t encoderLastState = 0;
-static int16_t turns = 0;
-
-static uint16_t btn_counter = 0;
-static encoder_btn_event_t btn_status = BTN_NOT;
-
-static void Encoder_Periodic_ISR(void);
 
 void encoderInit(void) {
     gpioMode(PIN_ENCODER_A, INPUT_PULLUP);
@@ -46,7 +18,7 @@ void encoderInit(void) {
     btn_counter = 0;
     btn_status = BTN_NOT;
 
-    pisrRegister(Encoder_Periodic_ISR, ISR_PERIOD_MS);
+    tickAdd(Encoder_Periodic_ISR, ISR_PERIOD_MS);
 }
 
 int16_t getTurns(void) {
