@@ -1,1 +1,6 @@
 /Debug/
+
+*.launch
+*.xml
+.cproject
+.project
