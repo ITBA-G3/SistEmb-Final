@@ -11,31 +11,28 @@ uint8_t BTN_states[3] = {0};
 
 void init_user_buttons(void)
 {
-    gpioMode(PIN_PLAY, INPUT);
-    gpioMode(PIN_PREV, INPUT);
-    gpioMode(PIN_NEXT, INPUT);
+    gpioMode(PIN_PLAY, INPUT_PULLDOWN);
+    gpioMode(PIN_PREV, INPUT_PULLDOWN);
+    gpioMode(PIN_NEXT, INPUT_PULLDOWN);
 
     PIT_Init(PIT_2, 200);
     PIT_SetCallback(btn_cb, PIT_2);
-
-    gpioMode(PORTNUM2PIN(PE,24), OUTPUT);
 }
 
 static void btn_cb(void)
 {
-    gpioToggle(PORTNUM2PIN(PE,24));
     static uint8_t prevState[3] = {0};
     static uint8_t state[3] = {0};
 
     state[PLAY_BTN] = gpioRead(PIN_PLAY);
-    state[NEXT_BTN] = gpioRead(PIN_PLAY);
-    state[PREV_BTN] = gpioRead(PIN_PLAY);
+    state[NEXT_BTN] = gpioRead(PIN_NEXT);
+    state[PREV_BTN] = gpioRead(PIN_PREV);
 
-    if((state[PLAY_BTN] == prevState[PLAY_BTN]) && (state[PLAY_BTN]==1))
+    if((state[PLAY_BTN] == prevState[PLAY_BTN]) && (state[PLAY_BTN]==HIGH))
         BTN_states[PLAY_BTN] = 1;
-    if((state[NEXT_BTN] == prevState[NEXT_BTN]) && (state[NEXT_BTN]==1))
+    if((state[NEXT_BTN] == prevState[NEXT_BTN]) && (state[NEXT_BTN]==HIGH))
         BTN_states[NEXT_BTN] = 1;
-    if((state[PREV_BTN] == prevState[PREV_BTN]) && (state[PREV_BTN]==1))
+    if((state[PREV_BTN] == prevState[PREV_BTN]) && (state[PREV_BTN]==HIGH))
         BTN_states[PREV_BTN] = 1;
 
     prevState[PLAY_BTN] = state[PLAY_BTN];

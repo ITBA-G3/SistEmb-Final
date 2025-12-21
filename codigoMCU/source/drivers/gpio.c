@@ -27,32 +27,40 @@ void gpioMode(pin_t pin, uint8_t mode)
         case PE: SIM->SCGC5 |= SIM_SCGC5_PORTE_MASK; break;
     }
 
-    PORT_Type* puerto = puertos[port];
-    GPIO_Type* gpio   = gpios[port];
+    PORT_Type* p = puertos[port];
+    GPIO_Type* g = gpios[port];
 
-    // Force GPIO mux
-    puerto->PCR[n] = (puerto->PCR[n] & ~PORT_PCR_MUX_MASK) | PORT_PCR_MUX(1);
+    // Armamos PCR "limpio"
+    uint32_t pcr = 0;
+    pcr |= PORT_PCR_MUX(1);        // GPIO
+    pcr |= PORT_PCR_PE_MASK * 0;   // por defecto sin pull
+    // pcr |= PORT_PCR_PFE_MASK;    // opcional: filtro pasivo p/ botones
 
     switch (mode) {
         case INPUT:
-            gpio->PDDR &= ~(1UL << n);
+            // sin pull
+            g->PDDR &= ~(1UL << n);
+            // asegurate de deshabilitar pull:
+            // (dejamos PE=0)
             break;
 
         case OUTPUT:
-            gpio->PDDR |= (1UL << n);
+            g->PDDR |= (1UL << n);
             break;
 
         case INPUT_PULLUP:
-            gpio->PDDR &= ~(1UL << n);
-            puerto->PCR[n] |= (PORT_PCR_PE_MASK | PORT_PCR_PS_MASK);
+            g->PDDR &= ~(1UL << n);
+            pcr |= PORT_PCR_PE_MASK | PORT_PCR_PS_MASK;  // pull-up
             break;
 
         case INPUT_PULLDOWN:
-            gpio->PDDR &= ~(1UL << n);
-            puerto->PCR[n] |= PORT_PCR_PE_MASK;
-            puerto->PCR[n] &= ~PORT_PCR_PS_MASK;
+            g->PDDR &= ~(1UL << n);
+            pcr |= PORT_PCR_PE_MASK;                     // pull enable
+            pcr &= ~PORT_PCR_PS_MASK;                    // pull-down
             break;
     }
+
+    p->PCR[n] = pcr;
 }
 
 void gpioWrite (pin_t pin, bool value)
@@ -76,7 +84,7 @@ void gpioToggle (pin_t pin)
 
 bool gpioRead (pin_t pin)
 {
-	GPIO_Type* gpio	 	= gpios[PIN2PORT(pin)];
+	GPIO_Type* gpio = gpios[PIN2PORT(pin)];
 
 	return ((gpio->PDIR & (1U<<PIN2NUM(pin))) != 0)? HIGH:LOW;
 }

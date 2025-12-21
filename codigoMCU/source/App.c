@@ -209,15 +209,21 @@ static void Main_Task(void *p_arg)
 
     init_LCD();
     init_user_buttons();
+    // SIM->SCGC5 |= SIM_SCGC5_PORTE_MASK;
 
+    gpioMode(PIN_LED_BLUE, OUTPUT);
+    gpioWrite(PIN_LED_BLUE, 0);
+    gpioMode(PIN_LED_GREEN, OUTPUT);
+    gpioWrite(PIN_LED_GREEN, 0);
+    gpioMode(PIN_LED_RED, OUTPUT);
+    gpioWrite(PIN_LED_RED, 0);
     gpioMode(PORTNUM2PIN(PE, 25), OUTPUT);
 
     while (1)
     {
-        gpioToggle(PIN_LED_BLUE);
         // Display
         if(get_BTN_state(PLAY_BTN))
-            gpioToggle(PIN_LED_BLUE);
+            gpioToggle(PORTNUM2PIN(PE, 25));
             // write_LCD("Play btn", 0);
         else if(get_BTN_state(NEXT_BTN))
             // write_LCD("next btn", 0);
@@ -226,14 +232,7 @@ static void Main_Task(void *p_arg)
             // write_LCD("next btn", 0);
             gpioToggle(PIN_LED_GREEN);
 
-        OSTimeDlyHMSM(0u, 0u, 0u, 500u, OS_OPT_TIME_HMSM_STRICT, &err);
-        if (err != OS_ERR_NONE) {
-        // señal dura de error
-        while (1) {
-            gpioToggle(PIN_LED_RED);
-            for (volatile int i=0;i<200000;i++);
-        }
-    }
+        OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
     }
 }
 
@@ -412,9 +411,6 @@ int main(void)
 #endif
 
     hw_Init();
-    NVIC_DisableIRQ(UART1_ERR_IRQn);
-    NVIC_ClearPendingIRQ(UART1_ERR_IRQn);
-
 
     OSInit(&err);
 #if OS_CFG_SCHED_ROUND_ROBIN_EN > 0u
