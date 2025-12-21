@@ -29,8 +29,6 @@ static volatile bool g_need_fill = false;
 
 static float g_phase = 0.0f;
 
-static void Audio_FillSine(volatile uint16_t *dst, uint32_t n);
-
 
 /**
  * @brief DMA major-loop completion callback.
@@ -88,9 +86,9 @@ static void PIT_cb(void){
  * Both ping-pong buffers are pre-filled before enabling DMA to avoid initial
  * underrun conditions.
  */
-void Audio_Init(void)
+void Audio_Init(uint32_t audio_fs)
 {
-    PIT_Init(PIT_1, AUDIO_FS_HZ);
+    PIT_Init(PIT_1, audio_fs);
 //    PIT_DisableInterrupt(PIT_1);		// i don't really need the pit irq
     PIT_SetCallback(PIT_cb, PIT_1);
 
@@ -148,8 +146,7 @@ void Audio_Init(void)
  *
  * This function must be called periodically from the main application loop.
  * When signaled by the DMA callback, it refills the buffer that has just
- * finished playing. In the current implementation, the buffer is filled
- * with a test sine waveform.
+ * finished playing.
  *
  * @note In the final system, this function will consume decoded PCM samples
  *       instead of generating a test tone.
@@ -168,36 +165,4 @@ void Audio_Service(void)
     if (!dst) return;
 
     MP3Player_FillDacBuffer(dst, AUDIO_BUF_LEN);
-//  //   Audio_FillSine(dst, AUDIO_BUF_LEN);
-}
-
-/**
- * @brief Fills an audio buffer with a continuous-phase sine wave.
- *
- * Generates a sine waveform at the configured test frequency and sample rate,
- * converts it to the DAC numeric range, and stores it in the provided buffer.
- * Phase continuity is preserved across consecutive calls.
- *
- * @param dst Pointer to the destination audio buffer.
- * @param n   Number of samples to generate.
- */
-static void Audio_FillSine(volatile uint16_t *dst, uint32_t n)
-{
-    const float phase_inc =
-        2.0f * 3.14159265358979323846f *
-        ((float)SINE_FREQ_HZ / (float)AUDIO_FS_HZ);
-
-    for (uint32_t i = 0; i < n; i++) {
-        float s = sinf(g_phase);
-
-        float y = (float)DAC_MID + 0.8f * (float)DAC_MID * s;
-        if (y < 0.0f) y = 0.0f;
-        if (y > (float)DAC_MAX) y = (float)DAC_MAX;
-
-        dst[i] = (uint16_t)(y + 0.5f);
-
-        g_phase += phase_inc;
-        if (g_phase >= 2.0f * 3.14159265358979323846f)
-            g_phase -= 2.0f * 3.14159265358979323846f;
-    }
 }

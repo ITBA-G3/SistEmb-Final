@@ -249,25 +249,21 @@ static void Audio_Task(void *p_arg)
     (void)p_arg;
     OS_ERR err;
 
-	 //Enable port clock for DAC pin
-	SIM->SCGC5 |= SIM_SCGC5_PORTB_MASK;
-
-	 //Put DAC pin in pure analog mode
-	PORTB->PCR[2] = 0;   // adjust pin number to your board
-
-	Audio_Init();
-	__enable_irq();
-
+    
     OSSemPend(&g_mp3ReadySem, 0, OS_OPT_PEND_BLOCKING, NULL, &err);
+    uint32_t fs_mp3 = MP3Player_GetSampleRateHz();
+    Audio_Init(fs_mp3);
+
     while (1) {
         // buttons state / debounce
-
+        
         // if (isPlaying)
         // {
             
-
+            
+    		gpioWrite(PORTNUM2PIN(PC,11), HIGH);
             Audio_Service();
-
+            gpioWrite(PORTNUM2PIN(PC,11), LOW);
             if(PIT_trigger){
                 PIT_trigger = false;
             }
@@ -389,7 +385,7 @@ static void PIT_cb(void)
 {
 	OS_ERR err;
 	OSSemPost(&LedFrameSem, OS_OPT_POST_1, &err);
-	gpioToggle(PORTNUM2PIN(PC,11));
+	// gpioToggle(PORTNUM2PIN(PC,11));
 }
 
 /********************************

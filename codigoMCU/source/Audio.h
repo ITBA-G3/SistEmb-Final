@@ -31,11 +31,12 @@
 #include "drivers/DAC/DAC.h"
 
 #define AUDIO_FS_HZ     44100u      // sample rate
-#define SINE_FREQ_HZ    1000u       // 1 kHz test tone
-#define AUDIO_BUF_LEN   512u        // must match DMA major loop
+#define AUDIO_BUF_LEN   4096u        // must match DMA major loop
 #define DAC_BITS        12u
 #define DAC_MAX         ((1u << DAC_BITS) - 1u)
 #define DAC_MID         (DAC_MAX / 2u)
+
+// extern uint32_t fs;
 
 // Flags defined in App.c as globals
 extern volatile bool PIT_trigger;
@@ -51,7 +52,7 @@ extern volatile uint16_t bufB[AUDIO_BUF_LEN];
  * Sets up PIT timing, DAC output, DMA transfers, and internal state required
  * for ping-pong buffered audio playback.
  */
-void Audio_Init(void);
+void Audio_Init(uint32_t audio_fs);
 
 /**
  * @brief Services audio buffer refilling.
