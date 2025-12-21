@@ -257,6 +257,34 @@ static void Main_Task(void *p_arg)
 
         OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
 
+        /****************************************** BUTTON EVENTS ******************************************/ 
+        if(get_BTN_state(PLAY_BTN)) {
+            switch (currentState) {
+            case APP_STATE_PLAYING:
+                currentEvent = APP_EVENT_PAUSE;
+                break;
+            case APP_STATE_PAUSED:
+                currentEvent = APP_EVENT_PLAY;
+                break;
+            default:
+                currentEvent = APP_EVENT_NONE;
+                break;
+            }
+        }
+        else if(get_BTN_state(NEXT_BTN))
+            currentEvent = (currentState == APP_STATE_SELECT_TRACK) ? APP_EVENT_NEXT_TRACK : APP_EVENT_NONE;
+        else if(get_BTN_state(PREV_BTN))
+            currentEvent = (currentState == APP_STATE_SELECT_TRACK) ? APP_EVENT_PREV_TRACK : APP_EVENT_NONE;
+        else currentEvent = APP_EVENT_NONE;
+        /**************************************************************************************************/ 
+        
+        /**************************************** ENCODER EVENTS ******************************************/
+        if(getTurns() > 0) currentEvent = APP_EVENT_ENC_RIGHT;
+        else if(getTurns() < 0) currentEvent = APP_EVENT_ENC_LEFT;
+        else if(getSwitchState() == BTN_CLICK) currentEvent = APP_EVENT_ENC_BUTTON;
+        else if(getSwitchState() == BTN_LONG_CLICK) currentEvent = APP_EVENT_ENC_BUTTON;
+        else currentEvent = APP_EVENT_NONE;
+        /**************************************************************************************************/
 
         switch (currentState){
         	case APP_STATE_SELECT_TRACK:
@@ -271,22 +299,32 @@ static void Main_Task(void *p_arg)
                     currentState = APP_STATE_PLAYING;
                     currentEvent = APP_EVENT_NONE;
                 }
-                else if(currentEvent == APP_EVENT_ENC_RIGHT ||
-                        currentEvent == APP_EVENT_NEXT_TRACK){
+                else if(currentEvent == APP_EVENT_ENC_RIGHT){
                     // actualiza display con la siguiente cancion
                     // puntero a la siguiente cancion
                     // SD browsing (metadata)
                     currentEvent = APP_EVENT_NONE;
                 }
-                else if(currentEvent == APP_EVENT_ENC_LEFT ||
-                        currentEvent == APP_EVENT_PREV_TRACK){
+                else if(currentEvent == APP_EVENT_ENC_LEFT){
                     // actualiza display con la cancion anterior
                     // puntero a la cancion anterior
                     // SD browsing (metadata)
                     currentEvent = APP_EVENT_NONE;
                 }
         		break;
-        	case APP_STATE_PLAYING: //solo espera eventos de pausa o cambio de track   
+
+        	case APP_STATE_PLAYING:
+                /* coming soon... */                
+                if(currentEvent == APP_EVENT_NEXT_TRACK){
+                    // empezar a reproducir el siguiente track
+                    currentEvent = APP_EVENT_NONE;
+                }
+                if(currentEvent == APP_EVENT_PREV_TRACK){
+                    // empezar a reproducir el track anterior
+                    currentEvent = APP_EVENT_NONE;
+                }
+
+                // transitions between states
         		if(currentEvent == APP_EVENT_PAUSE){
                     // pausar transferencia SD → audio (SD decoder + audio + ledMatrix)
                     // actualiza display para mostrar estado de pausa
@@ -305,19 +343,9 @@ static void Main_Task(void *p_arg)
                     currentState = APP_STATE_SELECT_TRACK;
                     currentEvent = APP_EVENT_NONE; //queda esperando alguna accion del encoder
                 }
-                /* coming soon... */
-                /*
-                if(currentEvent == APP_EVENT_NEXT_TRACK){
-                    // empezar a reproducir el siguiente track
-                    currentEvent = APP_EVENT_NONE;
-                }
-                if(currentEvent == APP_EVENT_PREV_TRACK){
-                    // empezar a reproducir el track anterior
-                    currentEvent = APP_EVENT_NONE;
-                }
-                */
         		break;
         	case APP_STATE_PAUSED:
+                // transitions between states
         		if(currentEvent == APP_EVENT_PLAY){
                     // empezar transferencia SD → audio desde donde quedo (SD decoder + audio + ledMatrix)
                     // actualiza display para mostrar estado de playing
@@ -333,6 +361,7 @@ static void Main_Task(void *p_arg)
                     currentState = APP_STATE_SELECT_TRACK;
                     currentEvent = APP_EVENT_NONE;
                 }
+                
                 /* coming soon... */
                 /*
                 if(currentEvent == APP_EVENT_NEXT_TRACK){
