@@ -106,12 +106,12 @@ sd_error_t sd_init(sd_card_t *card)
         e = sd_send_acmd(0, SD_ACMD_SD_SEND_OP_COND, ACMD41_ARG, SDHC_RESPONSE_TYPE_R3, &acmd41);
         if (e != SDHC_ERROR_OK) return sd_map_sdhc_err(e);
 
-        // R3: OCR en response[0]. El bit 31 “power up status” indica listo.
+        // R3: OCR en response[0]
         uint32_t ocr = acmd41.response[0];
         card->ocr = ocr;
 
         if (ocr & 0x80000000u) {
-            // Listo. CCS (bit 30) indica SDHC/SDXC si es 1.
+            //CCS (bit 30) indica SDHC/SDXC si es 1.
             card->is_sdhc = (ocr & 0x40000000u) ? true : false;
             break;
         }
@@ -121,11 +121,11 @@ sd_error_t sd_init(sd_card_t *card)
         }
     }
 
-    // 4) CMD2: ALL_SEND_CID (R2). No es estrictamente necesario para leer, pero es parte del flow.
+    //CMD2: ALL_SEND_CID (R2)
     e = sd_send_cmd(SD_CMD_ALL_SEND_CID, 0, SDHC_RESPONSE_TYPE_R2, NULL);
     if (e != SDHC_ERROR_OK) return sd_map_sdhc_err(e);
 
-    // 5) CMD3: SEND_REL_ADDR (R6). Devuelve RCA en [31:16] de la respuesta.
+    //CMD3: SEND_REL_ADDR (R6)
     sdhc_command_t cmd3 = {0};
     e = sd_send_cmd(SD_CMD_SEND_REL_ADDR, 0, SDHC_RESPONSE_TYPE_R6, &cmd3);
     if (e != SDHC_ERROR_OK) return sd_map_sdhc_err(e);
@@ -136,12 +136,11 @@ sd_error_t sd_init(sd_card_t *card)
     	return SDHC_ERROR_DATA;		// BAD RCA
     }
 
-    // 6) CMD7: SELECT_CARD (R1b idealmente, pero muchos drivers usan R1 y luego esperan busy)
-    // Arg = RCA<<16
+    //CMD7: SELECT_CARD 
     e = sd_send_cmd(SD_CMD_SELECT_CARD, (uint32_t)card->rca << 16, SDHC_RESPONSE_TYPE_R1, NULL);
     if (e != SDHC_ERROR_OK) return sd_map_sdhc_err(e);
 
-    // 7) CMD16 (SET_BLOCKLEN) solo si NO es SDHC. Para SDHC el block length es fijo 512.
+    //CMD16 (SET_BLOCKLEN) solo si NO es SDHC
     if (!card->is_sdhc) {
         e = sd_send_cmd(SD_CMD_SET_BLOCKLEN, 512u, SDHC_RESPONSE_TYPE_R1, NULL);
         if (e != SDHC_ERROR_OK) return sd_map_sdhc_err(e);
@@ -178,13 +177,10 @@ sd_error_t sd_read_blocks(sd_card_t *card, uint32_t lba, uint32_t *buf_w, uint32
     data.blockCount = block_count;
     data.readBuffer = buf_w;
     data.writeBuffer = NULL;
-    data.transferMode = SDHC_TRANSFER_MODE_ADMA2;//SDHC_TRANSFER_MODE_CPU; // o elegilo por config
+    data.transferMode = SDHC_TRANSFER_MODE_ADMA2;
 
     sdhc_error_t he = sdhc_transfer(&cmd, &data);
     if (he != SDHC_ERROR_OK) return sd_map_sdhc_err(he);
-
-    /* Si usás CMD18 y no tenés Auto CMD12, acá mandarías CMD12.
-       En tu SDHC, con AC12EN=1 y blockCount>1, lo hace el host. */
 
     return SD_OK;
 }
@@ -195,14 +191,12 @@ sd_error_t sd_write_blocks(sd_card_t *card, uint32_t lba, const uint32_t *buf_w,
     if (!buf_w || block_count == 0u) return SD_ERR_PARAM;
     if (((uintptr_t)buf_w & 0x3u) != 0u) return SD_ERR_PARAM;
 
-    /* (Opcional) ACMD23: pre-erase count para multi-write */
     if (block_count > 1u) {
         uint32_t r[4];
         sd_error_t e = sd_cmd55(card, r);
         if (e != SD_OK) return e;
 
         e = sd_cmd(23, block_count, SDHC_RESPONSE_TYPE_R1, NULL); // ACMD23
-        /* Si falla, no abortes necesariamente; podés seguir igual */
     }
 
     sdhc_command_t cmd = {0};
@@ -222,8 +216,8 @@ sd_error_t sd_write_blocks(sd_card_t *card, uint32_t lba, const uint32_t *buf_w,
     data.blockSize = SD_BLOCK_SIZE;
     data.blockCount = block_count;
     data.readBuffer = NULL;
-    data.writeBuffer = (uint32_t*)(uintptr_t)buf_w;  // por compatibilidad de tipo
-    data.transferMode = SDHC_TRANSFER_MODE_ADMA2;//SDHC_TRANSFER_MODE_CPU;
+    data.writeBuffer = (uint32_t*)(uintptr_t)buf_w;
+    data.transferMode = SDHC_TRANSFER_MODE_ADMA2;
 
     sdhc_error_t he = sdhc_transfer(&cmd, &data);
     if (he != SDHC_ERROR_OK) return sd_map_sdhc_err(he);
@@ -243,7 +237,7 @@ static sdhc_error_t sd_send_cmd0_with_retry(void)
         // Give the card extra clocks/time to wake up
         sdhc_initialization_clocks();
 
-        // Wait host not inhibited (recommended by RM flow)
+        // Wait host not inhibited
         uint32_t t = 0xFFFFFFu;
         while (t--)
         {
@@ -264,14 +258,12 @@ static sdhc_error_t sd_send_cmd0_with_retry(void)
 
         // Retry only if it's the "startup flake" class (timeout / crc)
         if ((e & (SDHC_ERROR_CMD_TIMEOUT | SDHC_ERROR_CMD_CRC)) == 0u) {
-            return e; // different error -> don't mask it
+            return e; 
         }
 
-        // Optional: also reset the CMD line between retries
         sdhc_reset(SDHC_RESET_CMD);
     }
 
-    // If we get here, retries exhausted. Return last observed error class.
     return (SDHC_ERROR_CMD_TIMEOUT | SDHC_ERROR_CMD_CRC);
 }
 
@@ -294,11 +286,9 @@ static inline sdhc_error_t sd_send_acmd(uint32_t rca16, uint8_t acmd_idx, uint32
                                        sdhc_response_type_t acmd_resp,
                                        sdhc_command_t *out_acmd)
 {
-    // CMD55: APP_CMD, argumento = RCA<<16 (si RCA aún no existe, se manda 0)
     sdhc_error_t e = sd_send_cmd(SD_CMD_APP_CMD, (uint32_t)rca16 << 16, SDHC_RESPONSE_TYPE_R1, NULL);
     if (e != SDHC_ERROR_OK) return e;
 
-    // ACMDxx
     return sd_send_cmd(acmd_idx, acmd_arg, acmd_resp, out_acmd);
 }
 

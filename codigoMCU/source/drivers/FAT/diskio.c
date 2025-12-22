@@ -78,7 +78,6 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, DWORD sector, UINT count)
     {
         sd_error_t e;
 
-        /* IMPORTANTE: buffer de FatFs puede NO estar alineado */
         if (((uintptr_t)buff & 0x3u) == 0u) {
             e = sd_read_blocks(&sd_card, sector, (uint32_t*)buff, 1);
         } else {
@@ -155,7 +154,6 @@ DRESULT disk_ioctl (
     switch (cmd)
     {
     case CTRL_SYNC:
-        /* SD write es síncrono en tu driver */
         return RES_OK;
 
     case GET_SECTOR_SIZE:
@@ -163,15 +161,12 @@ DRESULT disk_ioctl (
         return RES_OK;
 
     case GET_BLOCK_SIZE:
-        /* Erase block size en sectores (típicamente 1 o 8).
-           Para FAT, 1 es suficiente. */
+
         *(DWORD*)buff = 1;
         return RES_OK;
 
     case GET_SECTOR_COUNT:
-        /* Opcional pero recomendable.
-           Podés calcularlo leyendo CSD más adelante.
-           Por ahora: no implementado */
+
         return RES_PARERR;
     }
 

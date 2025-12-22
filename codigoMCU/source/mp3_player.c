@@ -1,8 +1,7 @@
 /*
  * mp3_player.c
- *
- *  Created on: 21 Dec 2025
- *      Author: hertt
+ *  Helper functions to decode MP3
+ *      Author: Grupo 3
  */
 
 
@@ -28,8 +27,6 @@
 #define DAC_MID (DAC_MAX/2u)
 #endif
 
-// static bool pcm_ring_push(int16_t s);
-
 static FIL *g_fp = NULL;
 static HMP3Decoder g_hmp3 = NULL;
 static MP3FrameInfo g_fi;
@@ -38,12 +35,10 @@ static uint8_t  g_inbuf[MP3_INBUF_SZ];          // lo que traigo de la sd
 static int      g_bytes_left = 0;
 static uint8_t *g_read_ptr   = g_inbuf;
 
-// PCM temporal (máx)
-static int16_t g_pcm[1152*8];//TODO si funciona volver acá
+static int16_t g_pcm[1152*8];
 static int     g_pcm_total = 0;
 static int     g_pcm_idx   = 0;
 
-// Para inspección si querés (no printf)
 volatile uint32_t g_mp3_decode_errs = 0;
 volatile uint32_t g_mp3_frames_ok   = 0;
 
@@ -72,9 +67,6 @@ static bool mp3_skip_id3v2(FIL *fp)
 static bool mp3_fill_inbuf(void)
 {
     if (g_bytes_left >= MP3_MIN_FILL) return true;
-//	gpioWrite(PORTNUM2PIN(PC,11),HIGH);
-
-    // Compactar (mejor con memmove)
     if (g_read_ptr != g_inbuf && g_bytes_left > 0) {
         memmove(g_inbuf, g_read_ptr, (size_t)g_bytes_left);
         g_read_ptr = g_inbuf;
@@ -85,20 +77,18 @@ static bool mp3_fill_inbuf(void)
     uint32_t space = (uint32_t)MP3_INBUF_SZ - (uint32_t)g_bytes_left;
     if (space == 0) return true;
 
-    // Leer chunk grande (cap), preferentemente múltiplo de 512
+    // Leer chunk grande, preferentemente múltiplo de 512
     uint32_t to_read = space;
     if (to_read > MP3_READ_CHUNK) to_read = MP3_READ_CHUNK;
 
-    // Alinear hacia abajo a 512 si no te deja en 0
     uint32_t aligned = to_read & ~0x1FFu;
-    if (aligned >= 512u) to_read = aligned;  // si queda muy chico, usá lo que haya
+    if (aligned >= 512u) to_read = aligned;
 
     UINT br = 0;
     FRESULT fr = f_read(g_fp, &g_inbuf[g_bytes_left], (UINT)to_read, &br);
     if (fr != FR_OK) return false;
 
     g_bytes_left += (int)br;
-//    gpioWrite(PORTNUM2PIN(PC,11),LOW);
     return (g_bytes_left > 0);
 }
 
@@ -109,7 +99,7 @@ static bool mp3_decode_next_frame(void)
     if (g_bytes_left < 4) return false;
     int off = MP3FindSyncWord(g_read_ptr, g_bytes_left);
     if (off < 0) {
-        // descartar casi todo y reintentar
+        // descartar y reintentar
         if (g_bytes_left > 16) {
             g_read_ptr += (g_bytes_left - 16);
             g_bytes_left = 16;
@@ -166,15 +156,10 @@ bool MP3Player_InitWithOpenFile(FIL *fp)
     g_bytes_left = 0;
     g_pcm_total = 0;
     g_pcm_idx = 0;
-
-    // Decodificar un frame para fijar frameInfo (samprate/chans) temprano
-    // Si falla, no abortamos: el Fill va a ir intentando.
     (void)mp3_decode_next_frame();
 
     return true;
 }
-
-////////////PRUEBAS
 
 static uint32_t pcm_ring_push_mono_block(const int16_t *pcm, uint32_t samps, uint32_t *io_idx)
 {
@@ -216,7 +201,7 @@ bool MP3Player_DecodeAsMuchAsPossibleToRing(void)
             }
         }
 
-        // 3) Empujar PCM pendiente del frame actual
+        // 3) push de PCM pendiente del frame actual
         uint32_t before = (uint32_t)g_pcm_idx;
 
         if (g_fi.nChans == 2) {
@@ -229,10 +214,10 @@ bool MP3Player_DecodeAsMuchAsPossibleToRing(void)
                                            (uint32_t*)&g_pcm_idx);
         }
 
-        // 4) Progreso o no
+        // 4) Progreso
         if ((uint32_t)g_pcm_idx != before) progressed = true;
 
-        // Si no pudiste empujar nada, ring lleno (o algo raro): cortar
+        // ring lleno
         if ((uint32_t)g_pcm_idx == before) return progressed;
     }
 }

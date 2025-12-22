@@ -1,8 +1,6 @@
 /*
  * mp3_player.h
- *
- *  Created on: 21 Dec 2025
- *      Author: hertt
+ *      Author: Grupo 3
  */
 
 #pragma once

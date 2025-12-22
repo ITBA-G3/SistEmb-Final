@@ -372,7 +372,7 @@ static void Main_Task(void *p_arg)
                 switch(currentEvent) {
                     case(APP_EVENT_BTN_PRESSED):
                     case(APP_EVENT_ENC_BUTTON):
-                        DMA_SetEnableRequest(DMA_CH1, true);   //T
+                        DMA_SetEnableRequest(DMA_CH1, true);
                         isPlaying = true;
 
                         SDState = APP_STATE_PLAYING;
@@ -471,19 +471,15 @@ static void LedMatrix_Task(void *p_arg)
 
     static int16_t frame[FFT_N];
 	static float bands[8];
+    bool ok = false;
 
     while (1) {
     	OSSemPend(&LedFrameSem, 0u, OS_OPT_PEND_BLOCKING, 0u, &err);
-
 		LEDM_SetBrightness(matrix, 2);
-
         MP3Player_GetLastPCMwindow(frame, FFT_N);
-
 		FFT_ComputeBands(frame, FFT_N, AUDIO_FS_HZ, bands);
-
 		Visualizer_DrawBars(bands, matrix);
-
-		bool ok = LEDM_Show(matrix);
+		ok = LEDM_Show(matrix);
 
 		if(ok){
 			while (LEDM_TransferInProgress()) {
@@ -518,7 +514,6 @@ static void SD_Task(void *p_arg)
     filenames_count = 0;
 
     #if FF_USE_LFN
-        // Si LFN está habilitado en FatFs
         static char lfn[128];
         fno.lfname = lfn;
         fno.lfsize = sizeof(lfn);
@@ -532,9 +527,9 @@ static void SD_Task(void *p_arg)
     for (;;) {
         fr = f_readdir(&dir, &fno);
         if (fr != FR_OK) break;
-        if (fno.fname[0] == 0) break;          // fin
+        if (fno.fname[0] == 0) break;          
 
-        if (fno.fattrib & AM_DIR) continue;    // descartar directorios
+        if (fno.fattrib & AM_DIR) continue;    
 
         const char *name =
         #if FF_USE_LFN
