@@ -129,7 +129,7 @@ void Audio_Init()
 	DMA_SetCurrMajorLoopCount (DMA_CH1, AUDIO_BUF_LEN);
 
     // Wrap source back to buffer start after major loop:
-    DMA_SetSourceLastAddrOffset(DMA_CH1, -(int32_t)(2 * AUDIO_BUF_LEN));
+    // DMA_SetSourceLastAddrOffset(DMA_CH1, -(int32_t)(2 * AUDIO_BUF_LEN));
 
     // Destination does not move
     DMA_SetDestLastAddrOffset(DMA_CH1, 0);
