@@ -22,6 +22,7 @@
 #include <stdbool.h>
 #include "mp3_player.h"
 #include "drivers/gpio.h"
+#include "os.h"
 
 // Internal states
 static volatile uint16_t *g_playing = NULL;     // buffer DMA is currently playing
@@ -30,7 +31,9 @@ static volatile bool g_need_fill = false;
 
 static float g_phase = 0.0f;
 
-extern volatile bool decode;
+
+extern volatile OS_SEM g_AudioSem;
+
 
 /**
  * @brief DMA major-loop completion callback.
@@ -63,7 +66,9 @@ static void AudioDMA_cb(void){
 
     g_fill_next = just_finished;    // Tell main loop which buffer to refill
     g_need_fill = true;
-    decode = true;
+
+    OS_ERR err;
+    OSSemPost(&g_AudioSem, OS_OPT_POST_1, &err);
 }
 
 /**

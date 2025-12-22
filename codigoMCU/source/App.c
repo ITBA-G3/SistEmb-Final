@@ -112,8 +112,7 @@ static OS_SEM DisplaySem;
 static OS_SEM LedFrameSem;
 static OS_SEM g_mp3ReadySem;        // 
 
-volatile OS_SEM g_audioFillSem;
-
+volatile OS_SEM g_AudioSem;         // indica que hay datos de audio listos
 
 
 /*******************************************************************************
@@ -166,7 +165,10 @@ static void App_TaskCreate(void)
 
     OSSemCreate(&g_mp3ReadySem, "mp3_ready", 0, &err);
 
-    OSSemCreate(&g_audioFillSem, "audio_ready", 0, &err);
+    OSSemCreate(&g_AudioSem,
+                    "Audio semaphore",
+                    0u,
+                    &err);
 
     // Create tasks                
 
@@ -289,8 +291,8 @@ static void Audio_Task(void *p_arg)
         
         // if (isPlaying)
         // {
-            
-    		// gpioWrite(PORTNUM2PIN(PC,11), HIGH);
+            OSSemPend(&g_AudioSem, 0u, OS_OPT_PEND_BLOCKING, 0u, &err);
+    		gpioWrite(PORTNUM2PIN(PC,11), HIGH);
             Audio_Service();
             // gpioWrite(PORTNUM2PIN(PC,11), LOW);
             if(PIT_trigger){
