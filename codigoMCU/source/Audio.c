@@ -29,6 +29,10 @@ static volatile uint16_t *g_playing = NULL;     // buffer DMA is currently playi
 static volatile uint16_t *g_fill_next = NULL;   // buffer CPU should refill next
 static volatile bool g_need_fill = false;
 
+static volatile bool g_need_fill_A = false;
+static volatile bool g_need_fill_B = false;
+
+
 //static float g_phase = 0.0f;
 
 
@@ -48,7 +52,7 @@ extern OS_SEM g_AudioSem;
 static void AudioDMA_cb(void){
     OS_ERR err;
 
-    gpioWrite(PORTNUM2PIN(PC,11), HIGH);
+    // gpioWrite(PORTNUM2PIN(PC,11), HIGH);
 
     OSIntEnter();
 
@@ -59,15 +63,11 @@ static void AudioDMA_cb(void){
     volatile uint16_t *next = (g_playing == bufA) ? bufB : bufA;
 
     g_playing = next;
-    g_fill_next = just_finished;    // Tell main loop which buffer to refill
+    // g_fill_next = just_finished;    // Tell main loop which buffer to refill
+    if (just_finished == bufA) g_need_fill_A = true;
+    else                      g_need_fill_B = true;
 
-    // ---- FLAG BINARIO ----
-    if (!g_need_fill) {
-        g_need_fill = true;
-        OSSemPost(&g_AudioSem, OS_OPT_POST_1, &err);
-    }
-    
-    // g_need_fill = true;
+    OSSemPost(&g_AudioSem, OS_OPT_POST_1, &err);
     
     DMA_SetSourceAddr(DMA_CH1, (uint32_t)next);		// Change DMA source to the next buffer and restart major loop
     DMA_SetCurrMajorLoopCount(DMA_CH1, AUDIO_BUF_LEN);	    // Reset loop counts for the new major loop
@@ -76,7 +76,7 @@ static void AudioDMA_cb(void){
     
     OSIntExit();
     
-    gpioWrite(PORTNUM2PIN(PC,11), LOW); 
+    // gpioWrite(PORTNUM2PIN(PC,11), LOW); 
 }
 
 /**
@@ -176,12 +176,10 @@ void Audio_Service(void)
     volatile uint16_t *dst = NULL;
     
     __disable_irq();
-    if (g_need_fill) {
-        dst = g_fill_next;   // take ownership of the buffer to fill
-        g_need_fill = false; // consume the request
-    }
+    if (g_need_fill_A) { g_need_fill_A = false; dst = bufA; }
+    else if (g_need_fill_B) { g_need_fill_B = false; dst = bufB; }
     __enable_irq();
-    
+
     if (!dst) return;
 
 //    if (pcm_ring_level() > AUDIO_BUF_LEN) {
