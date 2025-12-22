@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "mp3_player.h"
+#include "drivers/gpio.h"
 
 // Internal states
 static volatile uint16_t *g_playing = NULL;     // buffer DMA is currently playing
@@ -29,6 +30,7 @@ static volatile bool g_need_fill = false;
 
 static float g_phase = 0.0f;
 
+extern volatile bool decode;
 
 /**
  * @brief DMA major-loop completion callback.
@@ -61,6 +63,7 @@ static void AudioDMA_cb(void){
 
     g_fill_next = just_finished;    // Tell main loop which buffer to refill
     g_need_fill = true;
+    decode = true;
 }
 
 /**
@@ -86,9 +89,9 @@ static void PIT_cb(void){
  * Both ping-pong buffers are pre-filled before enabling DMA to avoid initial
  * underrun conditions.
  */
-void Audio_Init(uint32_t audio_fs)
+void Audio_Init()
 {
-    PIT_Init(PIT_1, audio_fs);
+    PIT_Init(PIT_1, 44100);
 //    PIT_DisableInterrupt(PIT_1);		// i don't really need the pit irq
     PIT_SetCallback(PIT_cb, PIT_1);
 
@@ -141,6 +144,14 @@ void Audio_Init(uint32_t audio_fs)
 }
 
 
+static inline uint16_t pcm16_to_dac(int16_t s)
+{
+    int32_t y = (int32_t)DAC_MID + ((int32_t)s * (int32_t)DAC_MID) / 32768;
+    if (y < 0) y = 0;
+    if (y > (int32_t)DAC_MAX) y = (int32_t)DAC_MAX;
+    return (uint16_t)y;
+}
+
 /**
  * @brief Audio background service routine.
  *
@@ -154,7 +165,7 @@ void Audio_Init(uint32_t audio_fs)
 void Audio_Service(void)
 {
     volatile uint16_t *dst = NULL;
-
+    
     __disable_irq();
     if (g_need_fill) {
         dst = g_fill_next;   // take ownership of the buffer to fill
@@ -163,6 +174,9 @@ void Audio_Service(void)
     __enable_irq();
     
     if (!dst) return;
+    
+    if (pcm_ring_level() > AUDIO_BUF_LEN) {
+        pcm_ring_pop_block(dst, AUDIO_BUF_LEN);
+    }
 
-    MP3Player_FillDacBuffer(dst, AUDIO_BUF_LEN);
 }

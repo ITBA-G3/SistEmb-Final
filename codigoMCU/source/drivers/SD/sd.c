@@ -194,7 +194,7 @@ sd_error_t sd_read_blocks(sd_card_t *card, uint32_t lba, uint32_t *buf_w, uint32
     data.blockCount = block_count;
     data.readBuffer = buf_w;
     data.writeBuffer = NULL;
-    data.transferMode = SDHC_TRANSFER_MODE_CPU; // o elegilo por config
+    data.transferMode = SDHC_TRANSFER_MODE_ADMA2;//SDHC_TRANSFER_MODE_CPU; // o elegilo por config
 
     sdhc_error_t he = sdhc_transfer(&cmd, &data);
     if (he != SDHC_ERROR_OK) return sd_map_sdhc_err(he);
@@ -239,7 +239,7 @@ sd_error_t sd_write_blocks(sd_card_t *card, uint32_t lba, const uint32_t *buf_w,
     data.blockCount = block_count;
     data.readBuffer = NULL;
     data.writeBuffer = (uint32_t*)(uintptr_t)buf_w;  // por compatibilidad de tipo
-    data.transferMode = SDHC_TRANSFER_MODE_CPU;
+    data.transferMode = SDHC_TRANSFER_MODE_ADMA2;//SDHC_TRANSFER_MODE_CPU;
 
     sdhc_error_t he = sdhc_transfer(&cmd, &data);
     if (he != SDHC_ERROR_OK) return sd_map_sdhc_err(he);

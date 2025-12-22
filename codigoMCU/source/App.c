@@ -45,6 +45,8 @@ volatile uint16_t bufB[AUDIO_BUF_LEN];
 
 bool isPlaying = false;
 
+volatile bool decode = true;
+
 // LED MATRIX
 static LEDM_t *matrix;
 static volatile bool start_new_frame;
@@ -71,18 +73,20 @@ static void ws2_dump_ftm_dma(void);
 #endif
 
 // task priorities 
-#define MAIN_TASK_PRIO      2u
-#define AUDIO_TASK_PRIO     3u
-#define SD_TASK_PRIO        4u
-#define DISP_TASK_PRIO      5u
-#define LEDMATRIX_TASK_PRIO       6u
+#define MAIN_TASK_PRIO              2u
+#define AUDIO_TASK_PRIO             3u
+#define SD_TASK_PRIO                2u
+#define DISP_TASK_PRIO              6u
+#define LEDMATRIX_TASK_PRIO         6u
+#define DECODE_TASK_PRIO            3u
 
 // stack sizes (check this values)
 #define MAIN_STK_SIZE               256u
-#define AUDIO_STK_SIZE              256u
-#define SD_STK_SIZE                 512u
+#define AUDIO_STK_SIZE              2048u
+#define SD_STK_SIZE                 1024u
 #define DISP_STK_SIZE               2048u
 #define LEDMATRIX_STK_SIZE          2048u
+#define DECODE_STK_SIZE             2048u
 
 /*******************************************************************************
  * RTOS OBJECTS DECLARATIONS
@@ -92,12 +96,14 @@ static CPU_STK AudioStk[AUDIO_STK_SIZE];
 static CPU_STK SdStk[SD_STK_SIZE];
 static CPU_STK DispStk[DISP_STK_SIZE];
 static CPU_STK LedStk[LEDMATRIX_STK_SIZE];
+static CPU_STK DecodeStk[DECODE_STK_SIZE];
 
 static OS_TCB MainTCB;
 static OS_TCB AudioTCB;
 static OS_TCB SdTCB;
 static OS_TCB DispTCB;
 static OS_TCB LedTCB;
+static OS_TCB DecodeTCB;
 
 static OS_Q     UiQ;        /* UI event queue */
 static OS_MUTEX AppMtx;     /* Application state mutex */
@@ -105,6 +111,7 @@ static OS_MUTEX AppMtx;     /* Application state mutex */
 static OS_SEM DisplaySem;
 static OS_SEM LedFrameSem;
 static OS_SEM g_mp3ReadySem;        // 
+
 
 
 /*******************************************************************************
@@ -123,6 +130,7 @@ static void Audio_Task(void *p_arg);
 static void Display_Task(void *p_arg);
 static void LedMatrix_Task(void *p_arg);
 static void SD_Task(void *p_arg);
+static void MP3Decode_Task(void *p_arg);
 
 void App_Init(void)
 {
@@ -215,6 +223,20 @@ static void App_TaskCreate(void)
 				 OS_OPT_TASK_STK_CHK | OS_OPT_TASK_SAVE_FP,
                  &err);
 
+    OSTaskCreate(&DecodeTCB,
+                "Decode Task",
+                MP3Decode_Task,
+				0,
+                DECODE_TASK_PRIO,
+                &SdStk[0],
+                DECODE_STK_SIZE / 10u,
+                DECODE_STK_SIZE,
+                0u,
+                0u,
+                0u,
+                OS_OPT_TASK_STK_CHK,
+                &err);
+                
     OSTaskCreate(&SdTCB,
                  "SD Task",
                  SD_Task,
@@ -250,16 +272,19 @@ static void Audio_Task(void *p_arg)
     OS_ERR err;
 
     
-    OSSemPend(&g_mp3ReadySem, 0, OS_OPT_PEND_BLOCKING, NULL, &err);
-    uint32_t fs_mp3 = MP3Player_GetSampleRateHz();
-    Audio_Init(fs_mp3);
+//    OSSemPend(&g_mp3ReadySem, 0, OS_OPT_PEND_BLOCKING, NULL, &err);
+    // while (pcm_ring_level() < (PCM_RING_SIZE / 8)) {
+    //     OSTimeDly(1u, OS_OPT_TIME_DLY, &err);
+    // }
+    
+    // uint32_t fs_mp3 = MP3Player_GetSampleRateHz();
+    Audio_Init();
 
     while (1) {
         // buttons state / debounce
         
         // if (isPlaying)
         // {
-            
             
     		gpioWrite(PORTNUM2PIN(PC,11), HIGH);
             Audio_Service();
@@ -271,7 +296,7 @@ static void Audio_Task(void *p_arg)
                 DMA_trigger = false;
             }
 
-            OSTimeDlyHMSM(0u, 0u, 0u, 10u, OS_OPT_TIME_HMSM_STRICT, &err);
+            // OSTimeDlyHMSM(0u, 0u, 0u, 10u, OS_OPT_TIME_HMSM_STRICT, &err);
         }
     // }
 }
@@ -301,10 +326,10 @@ static void LedMatrix_Task(void *p_arg)
 	PIT_Init(PIT_0, 10);		// PIT 0 para controlar FPS y refrescar matrix de leds,
 	PIT_SetCallback(PIT_cb, PIT_0);
 
-	gpioMode(PORTNUM2PIN(PC,10), OUTPUT);
-	gpioWrite(PORTNUM2PIN(PC,10), 1);
-	gpioMode(PORTNUM2PIN(PC,11), OUTPUT);
-	gpioWrite(PORTNUM2PIN(PC,11), 1);
+	// gpioMode(PORTNUM2PIN(PC,10), OUTPUT);
+	// gpioWrite(PORTNUM2PIN(PC,10), 1);
+	 gpioMode(PORTNUM2PIN(PC,11), OUTPUT);
+	 gpioWrite(PORTNUM2PIN(PC,11), 1);
 
 
     static int16_t frame[FFT_N];
@@ -333,6 +358,36 @@ static void LedMatrix_Task(void *p_arg)
     }
 }
 
+static void MP3Decode_Task(void *p_arg)
+{
+    (void)p_arg;
+    OS_ERR err;
+
+    // esperar que SD + Helix estén listos
+    OSSemPend(&g_mp3ReadySem, 0, OS_OPT_PEND_BLOCKING, NULL, &err);
+
+    // opcional: prellenar un poco antes de arrancar audio (ej 1/4 ring)
+    while (pcm_ring_level() < (PCM_RING_SIZE / 4)) {
+        (void)MP3Player_DecodeOneFrameToRing();
+    }
+
+    while (1) {
+        // Si hay espacio, decodificar más
+        if(decode){
+            decode = false;
+            if (pcm_ring_free() > 1152u) {        // margen: 1 frame mono ~1152
+                if (!MP3Player_DecodeOneFrameToRing()) {
+                    // EOF/underrun: podés dormir o marcar stop
+                    OSTimeDly(5u, OS_OPT_TIME_DLY, &err);
+                }
+            } else {
+                // ring lleno -> no gastar CPU
+                OSTimeDly(2u, OS_OPT_TIME_DLY, &err);
+            }
+
+        }
+    }
+}
 
 
 static FATFS g_fs;

@@ -23,6 +23,8 @@
 #define DAC_MID (DAC_MAX/2u)
 #endif
 
+static bool pcm_ring_push(int16_t s);
+
 static FIL *g_fp = NULL;
 static HMP3Decoder g_hmp3 = NULL;
 static MP3FrameInfo g_fi;
@@ -154,46 +156,37 @@ bool MP3Player_InitWithOpenFile(FIL *fp)
     return true;
 }
 
-void MP3Player_FillDacBuffer(volatile uint16_t *dst, uint32_t n)
+
+bool MP3Player_DecodeOneFrameToRing(void)
 {
-    if (!dst || n == 0) return;
+    if (!g_fp || !g_hmp3) return false;
 
-    if (!g_fp || !g_hmp3) {
-        for (uint32_t i = 0; i < n; i++) dst[i] = (uint16_t)DAC_MID;
-        return;
+    if (!mp3_decode_next_frame()) {
+        return false;
     }
 
-    uint32_t out = 0;
-    while (out < n) {
-        if (g_pcm_idx >= g_pcm_total) {
-            if (!mp3_decode_next_frame()) {
-                // underrun o EOF => midscale
-                dst[out++] = (uint16_t)DAC_MID;
-                continue;
-            }
+    // g_pcm_total y g_pcm[] ya están cargados
+    int idx = 0;
+
+    if (g_fi.nChans == 2) {
+        while (idx + 1 < g_pcm_total) {
+            int16_t mono = g_pcm[idx];
+            // int16_t R = g_pcm[idx + 1];
+            // int16_t mono = (int16_t)(((int32_t)L + (int32_t)R) / 2);
+            idx += 4;
+            if (!pcm_ring_push(mono)) return true; // ring lleno: salir, ya hay data
         }
-
-        int16_t mono = 0;
-
-        if (g_fi.nChans == 2) {
-            if (g_pcm_idx + 1 < g_pcm_total) {
-                int16_t L = g_pcm[g_pcm_idx];
-                int16_t R = g_pcm[g_pcm_idx + 1];
-                mono = (int16_t)(((int32_t)L + (int32_t)R) / 2);
-                g_pcm_idx += 2;
-            } else {
-                g_pcm_idx = g_pcm_total;
-                continue;
-            }
-        } else {
-            mono = g_pcm[g_pcm_idx++];
+    } else {
+        while (idx < g_pcm_total) {
+            int16_t mono = g_pcm[idx++];
+            if (!pcm_ring_push(mono)) return true;
         }
-
-        dst[out++] = pcm16_to_dac(mono);
     }
+
+    return true;
 }
 
-MP3Player_GetLastPCMwindow(int16_t *pcm, uint32_t max_samples)
+void MP3Player_GetLastPCMwindow(int16_t *pcm, uint32_t max_samples)
 {
     if (!pcm || max_samples == 0) return 0;
 
@@ -215,4 +208,35 @@ uint32_t MP3Player_GetSampleRateHz(void)
 uint32_t MP3Player_GetChannels(void)
 {
     return (uint32_t)g_fi.nChans;
+}
+
+uint32_t pcm_ring_level(void)
+{
+    return (uint32_t)(g_pcm_wr - g_pcm_rd);
+}
+
+uint32_t pcm_ring_free(void)
+{
+    return PCM_RING_SIZE - pcm_ring_level();
+}
+
+static bool pcm_ring_push(int16_t s)
+{
+    if (pcm_ring_free() == 0) return false;
+    g_pcm_ring[g_pcm_wr & PCM_RING_MASK] = s;
+    g_pcm_wr++;
+    return true;
+}
+
+uint32_t pcm_ring_pop_block(uint16_t *dst, uint32_t n)
+{
+    uint32_t avail = pcm_ring_level();
+    if (n > avail) n = avail;
+
+    for (uint32_t i = 0; i < n; i++) {
+        dst[i] = g_pcm_ring[g_pcm_rd & PCM_RING_MASK];
+        dst[i] = pcm16_to_dac(dst[i]);
+        g_pcm_rd++;
+    }
+    return n;
 }
