@@ -57,9 +57,9 @@
 #define	PIN_INFO_LED_1	PORTNUM2PIN(PB,19)
 
 // USER Switches
-#define PIN_PLAY        PORTNUM2PIN(PC, 0)
-#define PIN_PREV        PORTNUM2PIN(PC, 16)
-#define PIN_NEXT        PORTNUM2PIN(PB, 11)
+#define PIN_PLAY        PORTNUM2PIN(PB, 11)
+#define PIN_PREV        PORTNUM2PIN(PC, 0)
+#define PIN_NEXT        PORTNUM2PIN(PB, 20)
 
 // On Board User Switches
 #define PIN_SW2         PORTNUM2PIN(PC,6)

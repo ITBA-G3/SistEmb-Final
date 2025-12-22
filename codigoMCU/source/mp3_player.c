@@ -300,6 +300,11 @@ uint32_t pcm_ring_free(void)
 //     g_pcm_wr++;
 //     return true;
 // }
+void pcm_ring_clear(void)
+{
+    g_pcm_wr = 0;
+    g_pcm_rd = 0;
+}
 
 uint32_t pcm_ring_pop_block(volatile uint16_t *dst, uint32_t n)
 {

@@ -23,6 +23,8 @@
 #include "mp3_player.h"
 #include "drivers/gpio.h"
 #include "os.h"
+#include "equalizer.h"
+#include <arm_math.h>
 
 // Internal states
 static volatile uint16_t *g_playing = NULL;     // buffer DMA is currently playing
@@ -33,6 +35,9 @@ static volatile bool g_need_fill_A = false;
 static volatile bool g_need_fill_B = false;
 
 static volatile uint32_t got = AUDIO_BUF_LEN;
+
+static inline int16_t sat_i16(float32_t x);
+static void EQ_ProcessDacU16Buffer(volatile uint16_t *dst, uint32_t n);
 
 
 //static float g_phase = 0.0f;
@@ -158,6 +163,9 @@ void Audio_Init()
     // Continuous streaming: do NOT auto-disable requests at end
     DMA0->TCD[DMA_CH1].CSR &= ~DMA_CSR_DREQ_MASK;
 
+    initEqualizer();          // crea presets + arma biquad inicial
+    setGenre(GENRE_ROCK);     // o el que quieras por defecto
+
     DMA_SetEnableRequest(DMA_CH1, true);
 }
 
@@ -193,9 +201,51 @@ void Audio_Service(void)
 //    gpioWrite(PORTNUM2PIN(PC,11), HIGH);
 //    if (pcm_ring_level() > AUDIO_BUF_LEN) {
     got = pcm_ring_pop_block(dst, AUDIO_BUF_LEN);
+
 //    }
 //    gpioWrite(PORTNUM2PIN(PC,11), LOW);
+
+    if (got > 0) {
+        EQ_ProcessDacU16Buffer(dst, got);
+    }
+    
     for (uint32_t i = got; i < AUDIO_BUF_LEN; i++) {
             dst[i] = (uint16_t)DAC_MID;
 	}
+}
+
+static inline int16_t sat_i16(float32_t x)
+{
+    if (x > 32767.0f) return 32767;
+    if (x < -32768.0f) return -32768;
+    return (int16_t)x;
+}
+
+// Aplica EQ in-place sobre un buffer DAC uint16 (centrado en DAC_MID)
+static void EQ_ProcessDacU16Buffer(volatile uint16_t *dst, uint32_t n)
+{
+    // Tamaño: asegurate que AUDIO_BUF_LEN <= tamaño de estos arrays
+    static float32_t fin[AUDIO_BUF_LEN];
+    static float32_t fout[AUDIO_BUF_LEN];
+
+    // 1) uint16 (offset) -> float centrado en 0
+    //    OJO: dst es volatile, leemos una vez y trabajamos en float.
+    for (uint32_t i = 0; i < n; i++) {
+        int32_t centered = (int32_t)dst[i] - (int32_t)DAC_MID;   // ahora es signed alrededor de 0
+        fin[i] = (float32_t)centered;
+    }
+
+    // 2) Filtrado biquad (CMSIS)
+    blockEqualizer(fin, fout, n);
+
+    // 3) float -> uint16 con offset
+    for (uint32_t i = 0; i < n; i++) {
+        int16_t y = sat_i16(fout[i]);
+        int32_t u = (int32_t)y + (int32_t)DAC_MID;
+
+        // clamp a uint16 por las dudas (si DAC_MID no es 32768 exacto)
+        if (u < 0) u = 0;
+        if (u > 65535) u = 65535;
+        dst[i] = (uint16_t)u;
+    }
 }

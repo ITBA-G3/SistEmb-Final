@@ -33,5 +33,7 @@ uint32_t pcm_ring_level(void);
 uint32_t pcm_ring_free(void);
 uint32_t pcm_ring_pop_block(volatile uint16_t *dst, uint32_t n);
 
+void pcm_ring_clear(void);
+
 //para saber si un archivo es .mp3
 bool is_mp3_file(const char *name);
