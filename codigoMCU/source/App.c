@@ -51,9 +51,8 @@ volatile bool decode = true;
 static LEDM_t *matrix;
 static volatile bool start_new_frame;
 
-static void make_test_pcm(int16_t *pcm, uint32_t fs_hz);
+//static void make_test_pcm(int16_t *pcm, uint32_t fs_hz);
 static void PIT_cb(void);
-static void ws2_dump_ftm_dma(void);
 
 // FAT
 #ifndef MAX_LISTED_ENTRIES
@@ -73,11 +72,11 @@ static void ws2_dump_ftm_dma(void);
 #endif
 
 // task priorities 
-#define MAIN_TASK_PRIO              2u
-#define AUDIO_TASK_PRIO             3u
-#define SD_TASK_PRIO                2u
-#define DISP_TASK_PRIO              6u
-#define LEDMATRIX_TASK_PRIO         6u
+#define MAIN_TASK_PRIO              6u
+#define AUDIO_TASK_PRIO             2u
+#define SD_TASK_PRIO                3u
+#define DISP_TASK_PRIO              4u
+#define LEDMATRIX_TASK_PRIO         5u
 #define DECODE_TASK_PRIO            3u
 
 // stack sizes (check this values)
@@ -112,7 +111,7 @@ static OS_SEM DisplaySem;
 static OS_SEM LedFrameSem;
 static OS_SEM g_mp3ReadySem;        // 
 
-volatile OS_SEM g_AudioSem;         // indica que hay datos de audio listos
+OS_SEM g_AudioSem;         // indica que hay datos de audio listos
 
 
 /*******************************************************************************
@@ -131,7 +130,7 @@ static void Audio_Task(void *p_arg);
 static void Display_Task(void *p_arg);
 static void LedMatrix_Task(void *p_arg);
 static void SD_Task(void *p_arg);
-static void MP3Decode_Task(void *p_arg);
+static void Decode_Task(void *p_arg);
 
 void App_Init(void)
 {
@@ -150,9 +149,6 @@ static void App_TaskCreate(void)
     OS_ERR err;
 
     // Create RTOS objects
-//    OSQCreate(&UiQ, "UiQ", 16u, &err);
-//    OSSemCreate(&DispSem, "DispSem", 0u, &err);
-//    OSMutexCreate(&AppMtx, "AppMtx", &err);
 
 	OSSemCreate(&LedFrameSem,
 	                "LedFrameSem",
@@ -228,20 +224,6 @@ static void App_TaskCreate(void)
                  0u,
 				 OS_OPT_TASK_STK_CHK | OS_OPT_TASK_SAVE_FP,
                  &err);
-
-    OSTaskCreate(&DecodeTCB,
-                "Decode Task",
-                MP3Decode_Task,
-				0,
-                DECODE_TASK_PRIO,
-                &SdStk[0],
-                DECODE_STK_SIZE / 10u,
-                DECODE_STK_SIZE,
-                0u,
-                0u,
-                0u,
-                OS_OPT_TASK_STK_CHK,
-                &err);
                 
     OSTaskCreate(&SdTCB,
                  "SD Task",
@@ -256,6 +238,20 @@ static void App_TaskCreate(void)
                  0u,
                  OS_OPT_TASK_STK_CHK,
                  &err);
+
+//    OSTaskCreate(&DecodeTCB,
+//                "Decode Task",
+//                Decode_Task,
+//                0,
+//                DECODE_TASK_PRIO,
+//                &DecodeStk[0],
+//                DECODE_STK_SIZE / 10u,
+//                DECODE_STK_SIZE,
+//                0u,
+//                0u,
+//                0u,
+//                OS_OPT_TASK_STK_CHK,
+//                &err);
 }
 
 /* TASKS */
@@ -277,14 +273,22 @@ static void Audio_Task(void *p_arg)
     (void)p_arg;
     OS_ERR err;
 
-    
-//    OSSemPend(&g_mp3ReadySem, 0, OS_OPT_PEND_BLOCKING, NULL, &err);
     // while (pcm_ring_level() < (PCM_RING_SIZE / 8)) {
     //     OSTimeDly(1u, OS_OPT_TIME_DLY, &err);
     // }
     
     // uint32_t fs_mp3 = MP3Player_GetSampleRateHz();
+    gpioMode(PORTNUM2PIN(PC,10), OUTPUT);
+	gpioWrite(PORTNUM2PIN(PC,10), 1);
+	gpioMode(PORTNUM2PIN(PC,11), OUTPUT);
+	gpioWrite(PORTNUM2PIN(PC,11), 1);
+    
+    OSSemPend(&g_mp3ReadySem, 0, OS_OPT_PEND_BLOCKING, NULL, &err);
     Audio_Init();
+    // antes de arrancar DMA/audio
+    while (pcm_ring_level() < (AUDIO_BUF_LEN * 6)) {   // 6 bloques, ajustá
+        MP3Player_DecodeAsMuchAsPossibleToRing();
+    }
 
     while (1) {
         // buttons state / debounce
@@ -292,17 +296,9 @@ static void Audio_Task(void *p_arg)
         // if (isPlaying)
         // {
             OSSemPend(&g_AudioSem, 0u, OS_OPT_PEND_BLOCKING, 0u, &err);
-    		gpioWrite(PORTNUM2PIN(PC,11), HIGH);
+    		// gpioWrite(PORTNUM2PIN(PC,11), HIGH);
             Audio_Service();
-            // gpioWrite(PORTNUM2PIN(PC,11), LOW);
-            if(PIT_trigger){
-                PIT_trigger = false;
-            }
-            if(DMA_trigger){
-                DMA_trigger = false;
-            }
-
-            // OSTimeDlyHMSM(0u, 0u, 0u, 10u, OS_OPT_TIME_HMSM_STRICT, &err);
+            // gpioWrite(PORTNUM2PIN(PC,11), LOW);            
         }
     // }
 }
@@ -316,7 +312,7 @@ static void Display_Task(void *p_arg)
         // Display
     	OSSemPend(&DisplaySem, 0u, OS_OPT_PEND_BLOCKING, 0u, &err);
 
-        OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
+        OSTimeDlyHMSM(0,0,0,20, OS_OPT_TIME_HMSM_STRICT, &err);
     }
 }
 
@@ -332,24 +328,16 @@ static void LedMatrix_Task(void *p_arg)
 	PIT_Init(PIT_0, 10);		// PIT 0 para controlar FPS y refrescar matrix de leds,
 	PIT_SetCallback(PIT_cb, PIT_0);
 
-	// gpioMode(PORTNUM2PIN(PC,10), OUTPUT);
-	// gpioWrite(PORTNUM2PIN(PC,10), 1);
-	 gpioMode(PORTNUM2PIN(PC,11), OUTPUT);
-	 gpioWrite(PORTNUM2PIN(PC,11), 1);
-
-
     static int16_t frame[FFT_N];
 	static float bands[8];
-
 
     while (1) {
     	OSSemPend(&LedFrameSem, 0u, OS_OPT_PEND_BLOCKING, 0u, &err);
 
 		LEDM_SetBrightness(matrix, 2);
 
-//		make_test_pcm(frame, AUDIO_FS_HZ);
         MP3Player_GetLastPCMwindow(frame, FFT_N);
-//
+
 		FFT_ComputeBands(frame, FFT_N, AUDIO_FS_HZ, bands);
 
 		Visualizer_DrawBars(bands, matrix);
@@ -358,40 +346,10 @@ static void LedMatrix_Task(void *p_arg)
 
 		if(ok){
 			while (LEDM_TransferInProgress()) {
-			    OSTimeDly(5u, OS_OPT_TIME_DLY, &err);
+//			    OSTimeDly(5u, OS_OPT_TIME_DLY, &err);
+				OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
 			}
 		}
-    }
-}
-
-static void MP3Decode_Task(void *p_arg)
-{
-    (void)p_arg;
-    OS_ERR err;
-
-    // esperar que SD + Helix estén listos
-    OSSemPend(&g_mp3ReadySem, 0, OS_OPT_PEND_BLOCKING, NULL, &err);
-
-    // opcional: prellenar un poco antes de arrancar audio (ej 1/4 ring)
-    while (pcm_ring_level() < (PCM_RING_SIZE / 4)) {
-        (void)MP3Player_DecodeOneFrameToRing();
-    }
-
-    while (1) {
-        // Si hay espacio, decodificar más
-        if(decode){
-            decode = false;
-            if (pcm_ring_free() > 1152u) {        // margen: 1 frame mono ~1152
-                if (!MP3Player_DecodeOneFrameToRing()) {
-                    // EOF/underrun: podés dormir o marcar stop
-                    OSTimeDly(5u, OS_OPT_TIME_DLY, &err);
-                }
-            } else {
-                // ring lleno -> no gastar CPU
-                OSTimeDly(2u, OS_OPT_TIME_DLY, &err);
-            }
-
-        }
     }
 }
 
@@ -430,13 +388,34 @@ static void SD_Task(void *p_arg)
 
     OSSemPost(&g_mp3ReadySem, OS_OPT_POST_1, &err);
 
+    // // opcional: prellenar un poco antes de arrancar audio (ej 1/4 ring)
+    // while (pcm_ring_level() < (PCM_RING_SIZE / 4)) {
+    //     (void)MP3Player_DecodeOneFrameToRing();
+    // }
+
     // 5) A partir de acá, el audio task puede ir pidiendo samples.
     // Si querés, podés dormir esta task.
     while (1) {
-        OSTimeDlyHMSM(0u,0u,1u,0u, OS_OPT_TIME_HMSM_STRICT, &err);
+        // Si hay espacio, decodificar más
+        // if (!MP3Player_DecodeAsMuchAsPossibleToRing()) {
+        //     // EOF/underrun: podés dormir o marcar stop
+        //     OSTimeDly(5u, OS_OPT_TIME_DLY, &err);
+        // }
+        bool ok = MP3Player_DecodeAsMuchAsPossibleToRing();
+
+        if (!ok) {
+            // reintento corto, no 5 ticks
+            OSTimeDly(1u, OS_OPT_TIME_DLY, &err);
+        } else {
+            // si ya está bastante lleno, podés dormir un toque
+            if (pcm_ring_free() == 0) {
+                OSTimeDly(1u, OS_OPT_TIME_DLY, &err);
+            } else {
+                OSTimeDly(0u, OS_OPT_TIME_DLY, &err); // yield
+            }
+        }
     }
 }
-
 
 /********************************
  *      PIT CALLBACKS
@@ -446,33 +425,11 @@ static void PIT_cb(void)
 {
 	OS_ERR err;
 	OSSemPost(&LedFrameSem, OS_OPT_POST_1, &err);
-	// gpioToggle(PORTNUM2PIN(PC,11));
 }
 
 /********************************
  *      MAIN
  ********************************/
-
-static void ws2_dump_ftm_dma(void)
-{
-    volatile uint32_t ftm_sc   = FTM0->SC;
-    volatile uint32_t ftm_mod  = FTM0->MOD;
-    volatile uint32_t ftm_c0sc = FTM0->CONTROLS[0].CnSC;
-    volatile uint32_t ftm_c0v  = FTM0->CONTROLS[0].CnV;
-
-    volatile uint32_t erq    = DMA0->ERQ;
-    volatile uint8_t  mux0   = DMAMUX0->CHCFG[0];
-    volatile uint16_t citer  = DMA0->TCD[0].CITER_ELINKNO;
-    volatile uint16_t biter  = DMA0->TCD[0].BITER_ELINKNO;
-    volatile uint32_t csr    = DMA0->TCD[0].CSR;
-
-    (void)ftm_sc; (void)ftm_mod; (void)ftm_c0sc; (void)ftm_c0v;
-    (void)erq; (void)mux0; (void)citer; (void)biter; (void)csr;
-
-    // breakpoint here
-}
-
-
 
 
 int main(void)

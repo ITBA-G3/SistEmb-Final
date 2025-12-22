@@ -29,10 +29,10 @@ static volatile uint16_t *g_playing = NULL;     // buffer DMA is currently playi
 static volatile uint16_t *g_fill_next = NULL;   // buffer CPU should refill next
 static volatile bool g_need_fill = false;
 
-static float g_phase = 0.0f;
+//static float g_phase = 0.0f;
 
 
-extern volatile OS_SEM g_AudioSem;
+extern OS_SEM g_AudioSem;
 
 
 /**
@@ -46,29 +46,37 @@ extern volatile OS_SEM g_AudioSem;
  * @note This function is called from DMA interrupt context.
  */
 static void AudioDMA_cb(void){
-	DMA_trigger = true;
+    OS_ERR err;
 
-	DMA_SetEnableRequest(DMA_CH1, false);          // clear ERQ for that channel
+    gpioWrite(PORTNUM2PIN(PC,11), HIGH);
 
+    OSIntEnter();
+
+    DMA_SetEnableRequest(DMA_CH1, false);          // clear ERQ for that channel
 	DMA_ClearChannelIntFlag(DMA_CH1);
-
+    
     volatile uint16_t *just_finished = g_playing;
     volatile uint16_t *next = (g_playing == bufA) ? bufB : bufA;
 
     g_playing = next;
+    g_fill_next = just_finished;    // Tell main loop which buffer to refill
 
+    // ---- FLAG BINARIO ----
+    if (!g_need_fill) {
+        g_need_fill = true;
+        OSSemPost(&g_AudioSem, OS_OPT_POST_1, &err);
+    }
+    
+    // g_need_fill = true;
+    
     DMA_SetSourceAddr(DMA_CH1, (uint32_t)next);		// Change DMA source to the next buffer and restart major loop
-
     DMA_SetCurrMajorLoopCount(DMA_CH1, AUDIO_BUF_LEN);	    // Reset loop counts for the new major loop
     DMA_SetStartMajorLoopCount(DMA_CH1, AUDIO_BUF_LEN);
-
     DMA_SetEnableRequest(DMA_CH1, true);
-
-    g_fill_next = just_finished;    // Tell main loop which buffer to refill
-    g_need_fill = true;
-
-    OS_ERR err;
-    OSSemPost(&g_AudioSem, OS_OPT_POST_1, &err);
+    
+    OSIntExit();
+    
+    gpioWrite(PORTNUM2PIN(PC,11), LOW); 
 }
 
 /**
@@ -81,7 +89,6 @@ static void AudioDMA_cb(void){
  *       this callback can be used for debugging or timing instrumentation.
  */
 static void PIT_cb(void){
-	PIT_trigger = true;
 }
 
 /**
@@ -97,8 +104,8 @@ static void PIT_cb(void){
 void Audio_Init()
 {
     PIT_Init(PIT_1, 44100);
-//    PIT_DisableInterrupt(PIT_1);		// i don't really need the pit irq
-    PIT_SetCallback(PIT_cb, PIT_1);
+    PIT_DisableInterrupt(PIT_1);		// i don't really need the pit irq
+    // PIT_SetCallback(PIT_cb, PIT_1);
 
     DAC_Init(DAC0);
     DAC_SetData(DAC0, DAC_MID); // midscale
@@ -132,9 +139,6 @@ void Audio_Init()
     // Major loop counts: set once
 	DMA_SetStartMajorLoopCount(DMA_CH1, AUDIO_BUF_LEN);
 	DMA_SetCurrMajorLoopCount (DMA_CH1, AUDIO_BUF_LEN);
-
-    // Wrap source back to buffer start after major loop:
-    // DMA_SetSourceLastAddrOffset(DMA_CH1, -(int32_t)(2 * AUDIO_BUF_LEN));
 
     // Destination does not move
     DMA_SetDestLastAddrOffset(DMA_CH1, 0);
@@ -179,9 +183,11 @@ void Audio_Service(void)
     __enable_irq();
     
     if (!dst) return;
-    
-    if (pcm_ring_level() > AUDIO_BUF_LEN) {
-        pcm_ring_pop_block(dst, AUDIO_BUF_LEN);
-    }
 
+//    if (pcm_ring_level() > AUDIO_BUF_LEN) {
+    uint32_t got = pcm_ring_pop_block(dst, AUDIO_BUF_LEN);
+//    }
+    for (uint32_t i = got; i < AUDIO_BUF_LEN; i++) {
+            dst[i] = (uint16_t)DAC_MID;
+	}
 }

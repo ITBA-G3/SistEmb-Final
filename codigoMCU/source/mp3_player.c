@@ -14,7 +14,7 @@
 
 // Ajustes
 #define MP3_INBUF_SZ   4096
-#define MP3_MIN_FILL   1024
+#define MP3_MIN_FILL   2048
 
 #ifndef DAC_MAX
 #define DAC_MAX 4095u
@@ -34,13 +34,15 @@ static int      g_bytes_left = 0;
 static uint8_t *g_read_ptr   = g_inbuf;
 
 // PCM temporal (máx)
-static int16_t g_pcm[1152 * 2];
+static int16_t g_pcm[1152 * 8];//TODO si funciona volver acá
 static int     g_pcm_total = 0;
 static int     g_pcm_idx   = 0;
 
 // Para inspección si querés (no printf)
 volatile uint32_t g_mp3_decode_errs = 0;
 volatile uint32_t g_mp3_frames_ok   = 0;
+
+static uint32_t pcm_ring_push_left_block(const int16_t *pcm, uint32_t interleaved_samps, uint32_t *io_idx);
 
 // --- ID3v2 skip (recomendado) ---
 static bool mp3_skip_id3v2(FIL *fp)
@@ -64,28 +66,33 @@ static bool mp3_skip_id3v2(FIL *fp)
 
 static bool mp3_fill_inbuf(void)
 {
-    if (g_bytes_left >= MP3_MIN_FILL) return true;
-
     // compactar bytes restantes al inicio
     if (g_read_ptr != g_inbuf && g_bytes_left > 0) {
-        for (int i = 0; i < g_bytes_left; i++) {
-            g_inbuf[i] = g_read_ptr[i];
-        }
+        for (int i = 0; i < g_bytes_left; i++) g_inbuf[i] = g_read_ptr[i];
         g_read_ptr = g_inbuf;
     } else if (g_bytes_left == 0) {
         g_read_ptr = g_inbuf;
     }
 
-    UINT br = 0;
-    uint32_t space = (uint32_t)MP3_INBUF_SZ - (uint32_t)g_bytes_left;
-    space &= ~(uint32_t)0x1FF;   // múltiplo de 512
-    if (space == 0) return true;
-    FRESULT fr = f_read(g_fp, &g_inbuf[g_bytes_left], (UINT)space, &br);
-    if (fr != FR_OK) {
-        return false;
+    while (g_bytes_left < MP3_MIN_FILL) {
+        uint32_t space = (uint32_t)MP3_INBUF_SZ - (uint32_t)g_bytes_left;
+        if (space == 0) break;
+
+        UINT br = 0;
+        FRESULT fr = f_read(g_fp, &g_inbuf[g_bytes_left], (UINT)space, &br);
+        if (fr != FR_OK) return false;
+
+        if (br == 0) {
+            // EOF real (o no hay más datos)
+            break;
+        }
+
+        g_bytes_left += (int)br;
     }
-    g_bytes_left += (int)br;
-    return true;
+
+    // devolvés true aunque no llegues a MIN_FILL si al menos tenés algo;
+    // pero ahora la chance de quedar “corto” baja muchísimo
+    return (g_bytes_left > 0);
 }
 
 static bool mp3_decode_next_frame(void)
@@ -157,38 +164,145 @@ bool MP3Player_InitWithOpenFile(FIL *fp)
 }
 
 
+//bool MP3Player_DecodeOneFrameToRing(void)
+//{
+//    if (!g_fp || !g_hmp3) return false;
+//
+//    if (!mp3_decode_next_frame()) {
+//        return false;
+//    }
+//
+//    // g_pcm_total y g_pcm[] ya están cargados
+//    int idx = 0;
+//
+//    if (g_fi.nChans == 2) {
+//        while (idx + 1 < g_pcm_total) {
+//            int16_t mono = g_pcm[idx];
+//            // int16_t R = g_pcm[idx + 1];
+//            // int16_t mono = (int16_t)(((int32_t)L + (int32_t)R) / 2);
+//            idx += 2;
+//            if (!pcm_ring_push(mono)) return true; // ring lleno: salir, ya hay data
+//        }
+//    } else {
+//        while (idx < g_pcm_total) {
+//            int16_t mono = g_pcm[idx++];
+//            if (!pcm_ring_push(mono)) return true;
+//        }
+//    }
+//
+//    return true;
+//}
+
+////////////PRUEBAS
 bool MP3Player_DecodeOneFrameToRing(void)
 {
     if (!g_fp || !g_hmp3) return false;
 
-    if (!mp3_decode_next_frame()) {
-        return false;
-    }
-
-    // g_pcm_total y g_pcm[] ya están cargados
-    int idx = 0;
-
-    if (g_fi.nChans == 2) {
-        while (idx + 1 < g_pcm_total) {
-            int16_t mono = g_pcm[idx];
-            // int16_t R = g_pcm[idx + 1];
-            // int16_t mono = (int16_t)(((int32_t)L + (int32_t)R) / 2);
-            idx += 2;
-            if (!pcm_ring_push(mono)) return true; // ring lleno: salir, ya hay data
+    // Mientras haya espacio en ring, empujar audio
+    // while (pcm_ring_free() > 0) {
+    for(int i = 0; i < 512; i++){
+        // Si no quedan samples del frame actual => decodificar otro
+        if (g_pcm_idx >= g_pcm_total-2048) {
+            if (!mp3_decode_next_frame()) {
+                return false; // EOF/underrun real
+            }
         }
-    } else {
-        while (idx < g_pcm_total) {
-            int16_t mono = g_pcm[idx++];
-            if (!pcm_ring_push(mono)) return true;
+        
+        if (g_fi.nChans == 2) {
+            // Empujar solo LEFT en bloque hasta que ring se llene o se acabe frame
+            pcm_ring_push_left_block(g_pcm, (uint32_t)g_pcm_total, (uint32_t*)&g_pcm_idx);
+        } else {
+            // Mono: empujar lo que se pueda
+            while (g_pcm_idx < g_pcm_total && pcm_ring_free() > 0) {
+                g_pcm_ring[g_pcm_wr & PCM_RING_MASK] = g_pcm[g_pcm_idx++];
+                g_pcm_wr++;
+            }
         }
+        
+        // Si ring se llenó, cortamos ya (sin seguir “recorriendo por deporte”)
+        if (pcm_ring_free() == 0) break;
     }
+    // }
 
     return true;
 }
 
+static uint32_t pcm_ring_push_mono_block(const int16_t *pcm, uint32_t samps, uint32_t *io_idx)
+{
+    uint32_t pushed = 0;
+
+    while (*io_idx < samps) {
+        uint32_t free = pcm_ring_free();
+        if (free == 0) break;
+
+        uint32_t remaining = samps - *io_idx;
+        uint32_t n = free;
+        if (n > remaining) n = remaining;
+
+        for (uint32_t k = 0; k < n; k++) {
+            g_pcm_ring[g_pcm_wr & PCM_RING_MASK] = pcm[*io_idx];
+            (*io_idx)++;
+            g_pcm_wr++;
+        }
+        pushed += n;
+    }
+    return pushed;
+}
+
+bool MP3Player_DecodeAsMuchAsPossibleToRing(void)
+{
+    if (!g_fp || !g_hmp3) return false;
+
+    bool progressed = false;
+    
+
+    for (;;) {
+        // Si no hay lugar, no tiene sentido decodificar más.
+        if (pcm_ring_free() == 0) {
+            return progressed ? true : false; // ring lleno: hiciste “lo posible”
+        }
+
+        // Decodificar un frame
+        if (!mp3_decode_next_frame()) {
+            // Si ya empujaste algo antes, devolvé true (hiciste progreso)
+            // Si no empujaste nada, devolvé false (no hubo progreso)
+            return progressed ? true : false;
+        }
+
+        // Empujar el frame decodificado en bloque
+        uint32_t idx = 0;
+
+        if (g_fi.nChans == 2) {
+            // stereo interleaved -> mono (left)
+        	uint32_t pushed = pcm_ring_push_left_block(g_pcm, (uint32_t)g_pcm_total, &idx);
+            if (pushed > 0) progressed = true;
+
+            // Si no pudiste empujar nada (ring lleno), cortá
+            if (pushed == 0) return true;
+
+        } else {
+            // mono -> mono
+            uint32_t pushed = pcm_ring_push_mono_block(g_pcm, (uint32_t)g_pcm_total, &idx);
+            if (pushed > 0) progressed = true;
+
+            if (pushed == 0) return true;
+        }
+
+        // Si por alguna razón quedó PCM sin empujar (ring chico), salís:
+        if (idx < (uint32_t)g_pcm_total) {
+            return true;
+        }
+
+        // Si querés evitar monopolizar CPU, podés poner un “budget” de frames por llamada:
+        // if (++frames_decoded >= 2) return true;
+    }
+}
+
+
+
 void MP3Player_GetLastPCMwindow(int16_t *pcm, uint32_t max_samples)
 {
-    if (!pcm || max_samples == 0) return 0;
+    if (!pcm || max_samples == 0) return;
 
     uint32_t to_copy = (uint32_t)g_pcm_total;
     if (to_copy > max_samples) {
@@ -228,15 +342,48 @@ static bool pcm_ring_push(int16_t s)
     return true;
 }
 
-uint32_t pcm_ring_pop_block(uint16_t *dst, uint32_t n)
+uint32_t pcm_ring_pop_block(volatile uint16_t *dst, uint32_t n)
 {
     uint32_t avail = pcm_ring_level();
     if (n > avail) n = avail;
 
     for (uint32_t i = 0; i < n; i++) {
-        dst[i] = g_pcm_ring[g_pcm_rd & PCM_RING_MASK];
-        dst[i] = pcm16_to_dac(dst[i]);
+        int16_t s = g_pcm_ring[g_pcm_rd & PCM_RING_MASK];
         g_pcm_rd++;
+        dst[i] = pcm16_to_dac(s);
     }
     return n;
+}
+
+static uint32_t pcm_ring_push_left_block(const int16_t *pcm, uint32_t interleaved_samps, uint32_t *io_idx)
+{
+    // interleaved_samps = g_pcm_total (ej: stereo => L,R,L,R...)
+    // io_idx: índice dentro de pcm[] (interleaved)
+    uint32_t pushed = 0;
+
+    while (*io_idx < interleaved_samps) {
+
+        uint32_t free = pcm_ring_free();
+        if (free == 0) break;
+
+        // Queremos empujar "mono" tomando solo L => consumimos 2 ints por sample mono
+        // Cantidad máxima de monos que podemos sacar de lo que queda del frame:
+        uint32_t remaining_inter = interleaved_samps - *io_idx;
+        uint32_t remaining_mono  = remaining_inter / 2;          // porque stereo consume 2 por mono (L,R)
+        if (remaining_mono == 0) break;
+
+        uint32_t n = free;
+        if (n > remaining_mono) n = remaining_mono;
+
+        // Escribimos n samples mono al ring
+        for (uint32_t k = 0; k < n; k++) {
+            int16_t L = pcm[*io_idx];     // left
+            *io_idx += 2;                 // saltar right
+            g_pcm_ring[g_pcm_wr & PCM_RING_MASK] = L;
+            g_pcm_wr++;
+        }
+        pushed += n;
+    }
+
+    return pushed;
 }
