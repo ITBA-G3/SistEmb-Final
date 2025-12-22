@@ -72,12 +72,12 @@ static void PIT_cb(void);
 #endif
 
 // task priorities 
-#define MAIN_TASK_PRIO              6u
-#define AUDIO_TASK_PRIO             2u
-#define SD_TASK_PRIO                3u
-#define DISP_TASK_PRIO              4u
-#define LEDMATRIX_TASK_PRIO         5u
-#define DECODE_TASK_PRIO            3u
+#define MAIN_TASK_PRIO              8u
+#define AUDIO_TASK_PRIO             5u
+#define SD_TASK_PRIO                4u
+#define DISP_TASK_PRIO              6u
+#define LEDMATRIX_TASK_PRIO         7u
+// #define DECODE_TASK_PRIO            5u
 
 // stack sizes (check this values)
 #define MAIN_STK_SIZE               256u

@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include "MK64F12.h"
 
 // Ajustes
 #define MP3_INBUF_SZ   4096
@@ -43,6 +44,7 @@ volatile uint32_t g_mp3_decode_errs = 0;
 volatile uint32_t g_mp3_frames_ok   = 0;
 
 static uint32_t pcm_ring_push_left_block(const int16_t *pcm, uint32_t interleaved_samps, uint32_t *io_idx);
+static inline void pcm_ring_snapshot(uint32_t *rd, uint32_t *wr);
 
 // --- ID3v2 skip (recomendado) ---
 static bool mp3_skip_id3v2(FIL *fp)
@@ -324,15 +326,28 @@ uint32_t MP3Player_GetChannels(void)
     return (uint32_t)g_fi.nChans;
 }
 
+static inline void pcm_ring_snapshot(uint32_t *rd, uint32_t *wr)
+{
+    __disable_irq();
+    *rd = g_pcm_rd;
+    *wr = g_pcm_wr;
+    __enable_irq();
+}
+
 uint32_t pcm_ring_level(void)
 {
-    return (uint32_t)(g_pcm_wr - g_pcm_rd);
+    uint32_t rd, wr;
+    pcm_ring_snapshot(&rd, &wr);
+    return (uint32_t)(wr - rd);
 }
 
 uint32_t pcm_ring_free(void)
 {
-    return PCM_RING_SIZE - pcm_ring_level();
+    uint32_t rd, wr;
+    pcm_ring_snapshot(&rd, &wr);
+    return (uint32_t)(PCM_RING_SIZE - (wr - rd));
 }
+
 
 static bool pcm_ring_push(int16_t s)
 {
@@ -344,46 +359,67 @@ static bool pcm_ring_push(int16_t s)
 
 uint32_t pcm_ring_pop_block(volatile uint16_t *dst, uint32_t n)
 {
-    uint32_t avail = pcm_ring_level();
+    uint32_t rd, wr;
+
+    __disable_irq();
+    rd = g_pcm_rd;
+    wr = g_pcm_wr;
+    __enable_irq();
+
+    uint32_t avail = (wr - rd);            // asumiendo indices crecientes
     if (n > avail) n = avail;
 
     for (uint32_t i = 0; i < n; i++) {
-        int16_t s = g_pcm_ring[g_pcm_rd & PCM_RING_MASK];
-        g_pcm_rd++;
+        int16_t s = g_pcm_ring[(rd + i) & PCM_RING_MASK];
         dst[i] = pcm16_to_dac(s);
     }
+
+    __disable_irq();
+    g_pcm_rd = rd + n;
+    __enable_irq();
+
     return n;
 }
 
-static uint32_t pcm_ring_push_left_block(const int16_t *pcm, uint32_t interleaved_samps, uint32_t *io_idx)
+static uint32_t pcm_ring_push_left_block(const int16_t *pcm,
+                                         uint32_t interleaved_samps,
+                                         uint32_t *io_idx)
 {
-    // interleaved_samps = g_pcm_total (ej: stereo => L,R,L,R...)
-    // io_idx: índice dentro de pcm[] (interleaved)
     uint32_t pushed = 0;
+    uint32_t rd, wr;
 
     while (*io_idx < interleaved_samps) {
 
-        uint32_t free = pcm_ring_free();
+        __disable_irq();
+        rd = g_pcm_rd;
+        wr = g_pcm_wr;
+        __enable_irq();
+
+        uint32_t free = PCM_RING_SIZE - (wr - rd);
         if (free == 0) break;
 
-        // Queremos empujar "mono" tomando solo L => consumimos 2 ints por sample mono
-        // Cantidad máxima de monos que podemos sacar de lo que queda del frame:
         uint32_t remaining_inter = interleaved_samps - *io_idx;
-        uint32_t remaining_mono  = remaining_inter / 2;          // porque stereo consume 2 por mono (L,R)
+        uint32_t remaining_mono  = remaining_inter / 2;
         if (remaining_mono == 0) break;
 
-        uint32_t n = free;
-        if (n > remaining_mono) n = remaining_mono;
+        uint32_t n = (free < remaining_mono) ? free : remaining_mono;
 
-        // Escribimos n samples mono al ring
+        // escribir usando un wr_local, sin tocar g_pcm_wr todavía
+        uint32_t wr_local = wr;
         for (uint32_t k = 0; k < n; k++) {
-            int16_t L = pcm[*io_idx];     // left
-            *io_idx += 2;                 // saltar right
-            g_pcm_ring[g_pcm_wr & PCM_RING_MASK] = L;
-            g_pcm_wr++;
+            int16_t L = pcm[*io_idx];
+            *io_idx += 2;
+            g_pcm_ring[wr_local & PCM_RING_MASK] = L;
+            wr_local++;
         }
+
+        __disable_irq();
+        g_pcm_wr = wr_local;
+        __enable_irq();
+
         pushed += n;
     }
 
     return pushed;
 }
+
