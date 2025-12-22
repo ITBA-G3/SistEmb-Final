@@ -173,7 +173,7 @@ bool MP3Player_DecodeOneFrameToRing(void)
             int16_t mono = g_pcm[idx];
             // int16_t R = g_pcm[idx + 1];
             // int16_t mono = (int16_t)(((int32_t)L + (int32_t)R) / 2);
-            idx += 4;
+            idx += 2;
             if (!pcm_ring_push(mono)) return true; // ring lleno: salir, ya hay data
         }
     } else {
