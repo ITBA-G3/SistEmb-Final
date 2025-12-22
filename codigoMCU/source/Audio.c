@@ -113,7 +113,7 @@ static void PIT_cb(void){
  */
 void Audio_Init()
 {
-    PIT_Init(PIT_1, 44100);
+    PIT_Init(PIT_1, AUDIO_FS_HZ);	// PIT 1 for audio sample rate timing
     PIT_DisableInterrupt(PIT_1);		// i don't really need the pit irq
     // PIT_SetCallback(PIT_cb, PIT_1);
 
