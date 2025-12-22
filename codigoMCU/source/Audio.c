@@ -32,6 +32,8 @@ static volatile bool g_need_fill = false;
 static volatile bool g_need_fill_A = false;
 static volatile bool g_need_fill_B = false;
 
+static volatile uint32_t got = AUDIO_BUF_LEN;
+
 
 //static float g_phase = 0.0f;
 
@@ -70,8 +72,16 @@ static void AudioDMA_cb(void){
     OSSemPost(&g_AudioSem, OS_OPT_POST_1, &err);
     
     DMA_SetSourceAddr(DMA_CH1, (uint32_t)next);		// Change DMA source to the next buffer and restart major loop
+    
+    // if(got == 0){
     DMA_SetCurrMajorLoopCount(DMA_CH1, AUDIO_BUF_LEN);	    // Reset loop counts for the new major loop
     DMA_SetStartMajorLoopCount(DMA_CH1, AUDIO_BUF_LEN);
+    // }
+    // else{
+    //     DMA_SetCurrMajorLoopCount(DMA_CH1, got);	    // Reset loop counts for the new major loop
+    //     DMA_SetStartMajorLoopCount(DMA_CH1, got);
+    // }
+
     DMA_SetEnableRequest(DMA_CH1, true);
     
     OSIntExit();
@@ -181,10 +191,11 @@ void Audio_Service(void)
     __enable_irq();
 
     if (!dst) return;
-
+//    gpioWrite(PORTNUM2PIN(PC,11), HIGH);
 //    if (pcm_ring_level() > AUDIO_BUF_LEN) {
-    uint32_t got = pcm_ring_pop_block(dst, AUDIO_BUF_LEN);
+    got = pcm_ring_pop_block(dst, AUDIO_BUF_LEN);
 //    }
+//    gpioWrite(PORTNUM2PIN(PC,11), LOW);
     for (uint32_t i = got; i < AUDIO_BUF_LEN; i++) {
             dst[i] = (uint16_t)DAC_MID;
 	}

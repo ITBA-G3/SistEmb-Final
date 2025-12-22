@@ -73,8 +73,8 @@ static void PIT_cb(void);
 
 // task priorities 
 #define MAIN_TASK_PRIO              8u
-#define AUDIO_TASK_PRIO             5u
-#define SD_TASK_PRIO                4u
+#define AUDIO_TASK_PRIO             4u
+#define SD_TASK_PRIO                5u
 #define DISP_TASK_PRIO              6u
 #define LEDMATRIX_TASK_PRIO         7u
 // #define DECODE_TASK_PRIO            5u
@@ -280,15 +280,11 @@ static void Audio_Task(void *p_arg)
     // uint32_t fs_mp3 = MP3Player_GetSampleRateHz();
     gpioMode(PORTNUM2PIN(PC,10), OUTPUT);
 	gpioWrite(PORTNUM2PIN(PC,10), 1);
-	gpioMode(PORTNUM2PIN(PC,11), OUTPUT);
-	gpioWrite(PORTNUM2PIN(PC,11), 1);
     
+
     OSSemPend(&g_mp3ReadySem, 0, OS_OPT_PEND_BLOCKING, NULL, &err);
     Audio_Init();
     // antes de arrancar DMA/audio
-    while (pcm_ring_level() < (AUDIO_BUF_LEN * 6)) {   // 6 bloques, ajustá
-        MP3Player_DecodeAsMuchAsPossibleToRing();
-    }
 
     while (1) {
         // buttons state / debounce
@@ -315,7 +311,6 @@ static void Display_Task(void *p_arg)
         OSTimeDlyHMSM(0,0,0,20, OS_OPT_TIME_HMSM_STRICT, &err);
     }
 }
-
 static void LedMatrix_Task(void *p_arg)
 {
     (void)p_arg;
@@ -385,8 +380,15 @@ static void SD_Task(void *p_arg)
     if (!MP3Player_InitWithOpenFile(&g_song)) {
         while (1) OSTimeDly(10u, OS_OPT_TIME_DLY, &err);
     }
+    
+    gpioMode(PORTNUM2PIN(PC,11), OUTPUT);
+	gpioWrite(PORTNUM2PIN(PC,11), 1);
 
     OSSemPost(&g_mp3ReadySem, OS_OPT_POST_1, &err);
+
+    while (pcm_ring_level() < (AUDIO_BUF_LEN * 12)) {   // 6 bloques, ajustá
+        MP3Player_DecodeAsMuchAsPossibleToRing();
+    }
 
     // // opcional: prellenar un poco antes de arrancar audio (ej 1/4 ring)
     // while (pcm_ring_level() < (PCM_RING_SIZE / 4)) {
@@ -401,7 +403,9 @@ static void SD_Task(void *p_arg)
         //     // EOF/underrun: podés dormir o marcar stop
         //     OSTimeDly(5u, OS_OPT_TIME_DLY, &err);
         // }
+//    	gpioWrite(PORTNUM2PIN(PC,11),HIGH);
         bool ok = MP3Player_DecodeAsMuchAsPossibleToRing();
+//        gpioWrite(PORTNUM2PIN(PC,11),LOW);
 
         if (!ok) {
             // reintento corto, no 5 ticks

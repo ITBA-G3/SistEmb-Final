@@ -30,8 +30,8 @@
 #include "drivers/DMA/DMA.h"
 #include "drivers/DAC/DAC.h"
 
-#define AUDIO_FS_HZ     44100u      // sample rate
-#define AUDIO_BUF_LEN   1152u       // must match DMA major loop
+#define AUDIO_FS_HZ     22050u      // sample rate
+#define AUDIO_BUF_LEN   576u       // must match DMA major loop
 #define DAC_BITS        12u
 #define DAC_MAX         ((1u << DAC_BITS) - 1u)
 #define DAC_MID         (DAC_MAX / 2u)
