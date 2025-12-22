@@ -133,7 +133,7 @@ void Audio_Init()
     DMA_SetSourceTransfSize(DMA_CH1, DMA_TransSize_16Bit);
     DMA_SetDestTransfSize(DMA_CH1, DMA_TransSize_16Bit);
 
-    DMA_SetMinorLoopTransCount(DMA_CH1, 2); // 1 sample = 2 bytes
+    // DMA_SetMinorLoopTransCount(DMA_CH1, 2); // 1 sample = 2 bytes
 
     // Major loop counts: set once
 	DMA_SetStartMajorLoopCount(DMA_CH1, AUDIO_BUF_LEN);

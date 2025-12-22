@@ -5,18 +5,21 @@
  ******************************************************************************/
 
 #include "LCD.h"
+#include "os.h"
 
 static volatile uint32_t TICKS_DELAY_MS = 0;
 
 static void delay_cb(void)
 {
     TICKS_DELAY_MS++;
+    gpioToggle(PORTNUM2PIN(PB,18));
 }
 
 static void delay_ms(uint32_t ms)
 {
     TICKS_DELAY_MS = 0;
     while (TICKS_DELAY_MS < ms);
+    // OSTimeDlyHMSM(0u, 0u, 0u, ms, OS_OPT_TIME_HMSM_NON_STRICT, NULL);
 }
 
 typedef struct {
@@ -28,6 +31,7 @@ display_t LCD = {{NULL, NULL}, {0, 0}};
 
 void init_LCD (void)
 {
+    gpioMode(PORTNUM2PIN(PB,18), OUTPUT); 
     init_I2C();
     tickAdd(delay_cb, 1);
     delay_ms(100);
