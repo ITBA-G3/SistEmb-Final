@@ -291,7 +291,7 @@ static void Audio_Task(void *p_arg)
         
         // if (isPlaying)
         // {
-            
+            OSSemPend(&g_AudioSem, 0u, OS_OPT_PEND_BLOCKING, 0u, &err);
     		gpioWrite(PORTNUM2PIN(PC,11), HIGH);
             Audio_Service();
             gpioWrite(PORTNUM2PIN(PC,11), LOW);
