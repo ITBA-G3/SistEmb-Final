@@ -22,6 +22,4 @@ typedef enum {
 void init_user_buttons(void);
 uint8_t get_BTN_state(btn_state_t btn);
 
-static void btn_cb();
-
 #endif // BTN

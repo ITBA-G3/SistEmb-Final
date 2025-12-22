@@ -30,40 +30,39 @@ void init_LCD (void)
 {
     init_I2C();
     tickAdd(delay_cb, 1);
-    delay_ms(40);
+    delay_ms(100);
 
-    uint8_t payload = (uint8_t)(1<<3);
+    char payload = (uint8_t)(1<<3);
     write_I2C(PCF8574T_SLAVE_ADDR, &payload, 1);
 
     delay_ms(5);
     // Dummy bytes
-    write_nibble(0b0011, 0, 0);
-    delay_ms(5);
-    write_nibble(0b0011, 0, 0);
-    delay_ms(3);
-    write_nibble(0b0011, 0, 0);
-    delay_ms(3);
+    for(int i=0; i<5; i++)
+    {
+        write_nibble(0b0011, 0, 0);
+        delay_ms(5);
+    }
     // set interface to 4-bit
     write_nibble(0b0010, 0, 0);
-    delay_ms(3);
+    delay_ms(5);
     // specify display lines & char font
     write_byte(0b00101000, 0, 0);
-    delay_ms(3);
+    delay_ms(5);
     // display off
     write_byte(0b00001000, 0, 0);
-    delay_ms(3);
+    delay_ms(5);
     // display clear
     write_byte(0b00000001, 0, 0);
     delay_ms(6);
     // Entry mode set
     write_byte(0b00000110, 0, 0);
-    delay_ms(3);
+    delay_ms(5);
     // display on
     write_byte(0b00001100, 0, 0);
-    delay_ms(400);
+    delay_ms(5);
 
     clear_LCD();
-    delay_ms(3);  
+    delay_ms(6);  
 }
 
 /**
@@ -93,7 +92,7 @@ void write_LCD(char* str, uint8_t line)
             write_byte(LCD.text[line][i], 0, 1);
 
     return_home();
-    delay_ms(50);
+    delay_ms(6);
 }
 
 void shift_LCD(uint8_t line)
@@ -146,7 +145,7 @@ void shift_LCD(uint8_t line)
 
 void return_home()
 {
-    static uint8_t data_byte = 0;
+    static char data_byte = 0;
 
     data_byte = 0b00000010;
     write_byte(data_byte, 0, 0);
@@ -154,7 +153,7 @@ void return_home()
 
 void set_cursor_line(uint8_t line)
 {
-    uint8_t data_byte = 0b10000000;
+    char data_byte = 0b10000000;
 
     if (line != 0)
         data_byte |= 0x40;
@@ -170,22 +169,25 @@ void write_byte(uint8_t data, uint8_t RW, uint8_t RS)
     lo = data << 4;
     ctrl = COMMAND_NIBBLE(RW,RS);
 
-    uint8_t payload[4]={hi | ctrl | EN_MASK,
+    char payload[6]={hi | ctrl,
+                        hi | ctrl | EN_MASK,
                         hi | ctrl,
+                        lo | ctrl,
                         lo | ctrl | EN_MASK,
                         lo | ctrl};
 
-    write_I2C(PCF8574T_SLAVE_ADDR, payload, 4);
+    write_I2C(PCF8574T_SLAVE_ADDR, payload, 6);
 }
 
 void write_nibble(uint8_t nibble, uint8_t RW, uint8_t RS)
 {
     uint8_t ctrl = COMMAND_NIBBLE(RW, RS), data = nibble << 4;
     
-    uint8_t payload[2]={data | ctrl | EN_MASK,
+    char payload[3]={data | ctrl,
+                        data | ctrl | EN_MASK,
                         data | ctrl};
 
-    write_I2C(PCF8574T_SLAVE_ADDR, payload, 2);
+    write_I2C(PCF8574T_SLAVE_ADDR, payload, 3);
 }
 
 
@@ -195,10 +197,8 @@ void write_nibble(uint8_t nibble, uint8_t RW, uint8_t RS)
 
 void clear_LCD()
 {
-    const uint8_t data=0b00000001;
+    const char data=0b00000001;
     write_byte(data, 0, 0);
-
-    // delay_ms(4);    
 }
 
 void clear_line(uint8_t line)

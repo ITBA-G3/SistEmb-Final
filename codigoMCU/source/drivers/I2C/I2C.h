@@ -20,6 +20,6 @@
 
 void init_I2C(void);
 
-bool write_I2C(uint8_t address, uint8_t *payload, uint8_t size);
+bool write_I2C(uint8_t address, char *payload, uint8_t size);
 
 #endif // _I2C_H

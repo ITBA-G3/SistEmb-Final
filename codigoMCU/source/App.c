@@ -72,6 +72,8 @@ static void ws2_dump_ftm_dma(void);
 #define DISP_STK_SIZE               2048u
 #define LEDMATRIX_STK_SIZE          2048u
 
+#define QUEUE_SIZE  10
+
 typedef enum {
     APP_STATE_PLAYING = 0,
     APP_STATE_PAUSED,
@@ -129,6 +131,8 @@ static void Display_Task(void *p_arg);
 static void LedMatrix_Task(void *p_arg);
 static void SD_Task(void *p_arg);
 
+// static OS_Q QDisplayLCD;
+
 void App_Init(void)
 {
     // OS Task creation & init
@@ -143,11 +147,6 @@ void App_Run(void)
 static void App_TaskCreate(void)
 {
     OS_ERR err;
-
-    // Create RTOS objects
-//    OSQCreate(&UiQ, "UiQ", 16u, &err);
-//    OSSemCreate(&DispSem, "DispSem", 0u, &err);
-//    OSMutexCreate(&AppMtx, "AppMtx", &err);
 
 	OSSemCreate(&LedFrameSem,
 	                "LedFrameSem",
@@ -240,17 +239,9 @@ static void Main_Task(void *p_arg)
     write_LCD("Welcome!", 0);
     OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
 
-    gpioMode(PIN_LED_BLUE, OUTPUT);
-    gpioWrite(PIN_LED_BLUE, 1);
-    gpioMode(PIN_LED_GREEN, OUTPUT);
-    gpioWrite(PIN_LED_GREEN, 1);
-    gpioMode(PIN_LED_RED, OUTPUT);
-    gpioWrite(PIN_LED_RED, 1);
-    gpioMode(PORTNUM2PIN(PE, 25), OUTPUT);
-
     while (1)
     {
-        /****************************************** BUTTON EVENTS ******************************************/ 
+        /****** BUTTON EVENTS ***************/ 
         if(get_BTN_state(PLAY_BTN))
         {
             switch (currentState)
@@ -271,9 +262,8 @@ static void Main_Task(void *p_arg)
         else if(get_BTN_state(PREV_BTN))
             currentEvent = (currentState == APP_STATE_SELECT_TRACK) ? APP_EVENT_PREV_TRACK : APP_EVENT_NONE;
         else currentEvent = APP_EVENT_NONE;
-        /**************************************************************************************************/ 
-        
-        /**************************************** ENCODER EVENTS ******************************************/
+        /****************************************/ 
+        /******** ENCODER EVENTS ****************/
         if(getTurns() > 0) 
             currentEvent = APP_EVENT_ENC_RIGHT;
         if(getTurns() < 0) 
@@ -282,110 +272,100 @@ static void Main_Task(void *p_arg)
             currentEvent = APP_EVENT_ENC_BUTTON;
         if(getSwitchState() == BTN_LONG_CLICK) 
             currentEvent = APP_EVENT_ENC_BUTTON;
-        /**************************************************************************************************/
+        /*****************************************/
 
         switch (currentState){
         	case APP_STATE_SELECT_TRACK:
                 // falta hacer el menu literalmente, 
                 // escribir cosas en el display
-
-                if(currentEvent == APP_EVENT_ENC_BUTTON){
-                    OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
-                    // guardar referencia a la canción que va a empezar a reproducir (SD)
-                    // empezar transferencia SD → audio (SD decoder + audio + ledMatrix)
-                    
-                    playingFlag = true;
-                    currentState = APP_STATE_PLAYING;
-                    currentEvent = APP_EVENT_NONE;
-                }
-                else if(currentEvent == APP_EVENT_ENC_RIGHT){
-                    OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
-                    // actualiza display con la siguiente cancion
-                    // puntero a la siguiente cancion
-                    // SD browsing (metadata)
-                    currentEvent = APP_EVENT_NONE;
-                }
-                else if(currentEvent == APP_EVENT_ENC_LEFT){
-                    OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
-                    // actualiza display con la cancion anterior
-                    // puntero a la cancion anterior
-                    // SD browsing (metadata)
-                    currentEvent = APP_EVENT_NONE;
+                switch(currentEvent) {
+                    case(APP_EVENT_ENC_BUTTON):
+                        // guardar referencia a la canción que va a empezar a reproducir (SD)
+                        // empezar transferencia SD → audio (SD decoder + audio + ledMatrix)
+                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
+                        playingFlag = true;
+                        currentState = APP_STATE_PLAYING;
+                        break;
+                    case(APP_EVENT_ENC_RIGHT):
+                        // actualiza display con la siguiente cancion
+                        // puntero a la siguiente cancion
+                        // SD browsing (metadata)
+                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
+                        break;
+                    case(APP_EVENT_ENC_LEFT):
+                        // actualiza display con la cancion anterior
+                        // puntero a la cancion anterior
+                        // SD browsing (metadata)
+                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
+                        break;
+                    default:
                 }
         		break;
 
         	case APP_STATE_PLAYING:
-                /* coming soon... */                
-                if(currentEvent == APP_EVENT_NEXT_TRACK){
-                    OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
-                    // empezar a reproducir el siguiente track
-                    currentEvent = APP_EVENT_NONE;
-                }
-                else if(currentEvent == APP_EVENT_PREV_TRACK){
-                    OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
-                    // empezar a reproducir el track anterior
-                    currentEvent = APP_EVENT_NONE;
-                }
-
-                // transitions between states
-        		if(currentEvent == APP_EVENT_PAUSE){
-                    OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
-                    // pausar transferencia SD → audio (SD decoder + audio + ledMatrix)
-                    // actualiza display para mostrar estado de pausa
-                    playingFlag = false;
-        			currentState = APP_STATE_PAUSED;
-        			currentEvent = APP_EVENT_NONE;
-        		}
-                if(currentEvent == APP_EVENT_ENC_BUTTON ||
-                   currentEvent == APP_EVENT_ENC_LEFT ||
-                   currentEvent == APP_EVENT_ENC_RIGHT){
-                    OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
-                    // pausar transferencia SD → audio (SD decoder + audio + ledMatrix)
-                    // actualiza display con el menu
-                    // puntero a la cancion anterior
-                    // SD browsing (metadata)
-                    playingFlag = false;
-                    currentState = APP_STATE_SELECT_TRACK;
-                    currentEvent = APP_EVENT_NONE; //queda esperando alguna accion del encoder
+                switch(currentEvent) {
+                    case(APP_EVENT_NEXT_TRACK):
+                        // empezar a reproducir el siguiente track
+                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
+                        break;
+                    case(APP_EVENT_PREV_TRACK):
+                        // empezar a reproducir el track anterior
+                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
+                        break;
+                    case(APP_EVENT_PAUSE):
+                    // transitions between states
+                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
+                        // pausar transferencia SD → audio (SD decoder + audio + ledMatrix)
+                        // actualiza display para mostrar estado de pausa
+                        playingFlag = false;
+                        currentState = APP_STATE_PAUSED;
+                        break;
+                    case(APP_EVENT_ENC_RIGHT):
+                    case(APP_EVENT_ENC_LEFT):
+                    case(APP_EVENT_ENC_BUTTON):
+                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
+                        // pausar transferencia SD → audio (SD decoder + audio + ledMatrix)
+                        // actualiza display con el menu
+                        // puntero a la cancion anterior
+                        // SD browsing (metadata)
+                        playingFlag = false;
+                        currentState = APP_STATE_SELECT_TRACK;
+                        break;
+                    default:
                 }
         		break;
         	case APP_STATE_PAUSED:
-                // transitions between states
-        		if(currentEvent == APP_EVENT_PLAY){
-                    OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
-                    // empezar transferencia SD → audio desde donde quedo (SD decoder + audio + ledMatrix)
-                    // actualiza display para mostrar estado de playing
-                    playingFlag = true;
-        			currentState = APP_STATE_PLAYING;
-        			currentEvent = APP_EVENT_NONE;
-        		}
-                if(currentEvent == APP_EVENT_ENC_BUTTON ||
-                   currentEvent == APP_EVENT_ENC_LEFT ||
-                   currentEvent == APP_EVENT_ENC_RIGHT){
-                    OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
-                    // ir a seleccion de track
-                    playingFlag = false;
-                    currentState = APP_STATE_SELECT_TRACK;
-                    currentEvent = APP_EVENT_NONE;
+                switch(currentEvent) {
+                    case(APP_EVENT_PLAY):
+                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
+                        // empezar transferencia SD → audio desde donde quedo (SD decoder + audio + ledMatrix)
+                        // actualiza display para mostrar estado de playing
+                        playingFlag = true;
+                        currentState = APP_STATE_PLAYING;
+                        break;
+                    case(APP_EVENT_ENC_RIGHT):
+                    case(APP_EVENT_ENC_LEFT):
+                    case(APP_EVENT_ENC_BUTTON):
+                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
+                        // ir a seleccion de track
+                        playingFlag = false;
+                        currentState = APP_STATE_SELECT_TRACK;
+                        break;
+                    // case(APP_EVENT_NEXT_TRACK):
+                    //     // empezar a reproducir el siguiente track
+                    //     currentState = APP_STATE_PLAYING;
+                    //     currentEvent = APP_EVENT_NONE;
+                    //     break;
+                    // case(APP_EVENT_PREV_TRACK):
+                    //     // empezar a reproducir el track anterior
+                    //     currentState = APP_STATE_PLAYING;
+                    //     currentEvent = APP_EVENT_NONE;
+                    //     break;
+                    default:
                 }
-                
-                /* coming soon... */
-                /*
-                if(currentEvent == APP_EVENT_NEXT_TRACK){
-                    // empezar a reproducir el siguiente track
-                    currentState = APP_STATE_PLAYING;
-                    currentEvent = APP_EVENT_NONE;
-                }
-                if(currentEvent == APP_EVENT_PREV_TRACK){
-                    // empezar a reproducir el track anterior
-                    currentState = APP_STATE_PLAYING;
-                    currentEvent = APP_EVENT_NONE;
-                }
-                */
         		break;
         }
         OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
-
     }
 }
 
@@ -455,7 +435,7 @@ static void Display_Task(void *p_arg)
                 break;
             default:
         }
-        OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
+        currentEvent = APP_EVENT_NONE;
     }
 }
 

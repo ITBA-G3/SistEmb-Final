@@ -38,13 +38,6 @@ typedef enum {
 #define STATE_10    0b10
 #define STATE_11    0b11
 
-static uint8_t encoderLastState = 0;
-static int16_t turns = 0;
-
-static uint16_t btn_counter = 0;
-static encoder_btn_event_t btn_status = BTN_NOT;
-
-static void Encoder_Periodic_ISR(void);
 
 /*******************************************************************************
  * FUNCTION PROTOTYPES

@@ -7,6 +7,8 @@
 
 #include "BTN.h"
 
+static void btn_cb();
+
 uint8_t BTN_states[3] = {0};
 
 void init_user_buttons(void)
@@ -15,12 +17,7 @@ void init_user_buttons(void)
     gpioMode(PIN_PREV, INPUT_PULLDOWN);
     gpioMode(PIN_NEXT, INPUT_PULLDOWN);
 
-    gpioMode(PORTNUM2PIN(PC,5), OUTPUT); 
-
     tickAdd(btn_cb, 5);
-    // PIT_Init(PIT_3, 1000);    // PIT3@1kHz
-    // PIT_SetMultCallback(btn_cb, 200);
-
 }
 
 static void btn_cb(void)
