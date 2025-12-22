@@ -12,7 +12,7 @@
 #define SD_CMD_ALL_SEND_CID         2   // CMD2
 #define SD_CMD_SEND_REL_ADDR        3   // CMD3
 #define SD_CMD_SELECT_CARD          7   // CMD7
-#define SD_CMD_SET_BLOCKLEN         16  // CMD16 (solo relevante en SDSC normalmente)
+#define SD_CMD_SET_BLOCKLEN         16  // CMD16
 
 #define SD_BLOCK_SIZE 512
 
@@ -34,12 +34,10 @@ typedef enum {
     SD_ERR_HOST,
 } sd_error_t;
 
-/* Inicialización de tarjeta SD en modo 1-bit, usando el host SDHC ya inicializado */
+// Inicialización de tarjeta SD en modo 1-bit, usando el host SDHC. Asume SDHC inicializado
 sd_error_t sd_init(sd_card_t *card);
 
-/* Lectura/escritura por bloques (512B). buf debe estar alineado a 4 bytes si usás CPU FIFO (DATPORT) */
 sd_error_t sd_read_blocks(sd_card_t *card, uint32_t lba, uint32_t *buf_w, uint32_t block_count);
 sd_error_t sd_write_blocks(sd_card_t *card, uint32_t lba, const uint32_t *buf_w, uint32_t block_count);
-
 
 #endif //SD_H

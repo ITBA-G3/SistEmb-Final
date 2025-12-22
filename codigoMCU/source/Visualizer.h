@@ -19,17 +19,6 @@
 #include "LEDmatrix.h"
 
 /**
- * @brief Generates and renders a test visualization frame.
- *
- * Produces synthetic band-energy data (phase-shifted sine waves) and
- * draws the corresponding bar visualization on the LED matrix.
- * Intended for testing the visualizer without real FFT input.
- *
- * @param matrix Pointer to the LED matrix instance to render into.
- */
-void Visualizer_UpdateFrame(LEDM_t* matrix);
-
-/**
  * @brief Renders an 8-band vertical bar visualization on the LED matrix.
  *
  * Each band represents a normalized energy value and is displayed as a

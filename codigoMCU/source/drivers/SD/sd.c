@@ -6,7 +6,6 @@
 #include "MK64F12.h"
 #include "board.h"
 
-/*function prototypes*/
 static sdhc_error_t sd_send_cmd0_with_retry(void);
 static inline sdhc_error_t sd_send_cmd(uint8_t idx, uint32_t arg,
                                       sdhc_response_type_t respType,
@@ -15,7 +14,6 @@ static inline sdhc_error_t sd_send_acmd(uint32_t rca16, uint8_t acmd_idx, uint32
                                        sdhc_response_type_t acmd_resp,
                                        sdhc_command_t *out_acmd);
 
-/* Helpers para mapear errores SDHC -> SD */
 static sd_error_t sd_map_sdhc_err(sdhc_error_t e)
 {
     if (e == SDHC_ERROR_OK)
@@ -36,7 +34,6 @@ static inline uint32_t sd_addr_arg(const sd_card_t *card, uint32_t lba)
     return card->is_sdhc ? lba : (lba * SD_BLOCK_SIZE);
 }
 
-/* Enviar comando sin data */
 static sd_error_t sd_cmd(uint8_t idx, uint32_t arg, sdhc_response_type_t resp, uint32_t r[4])
 {
     sdhc_command_t cmd = {0};
@@ -54,29 +51,24 @@ static sd_error_t sd_cmd(uint8_t idx, uint32_t arg, sdhc_response_type_t resp, u
     return SD_OK;
 }
 
-/* CMD55 (APP_CMD) */
 static sd_error_t sd_cmd55(const sd_card_t *card, uint32_t r[4])
 {
     return sd_cmd(55, ((uint32_t)card->rca) << 16, SDHC_RESPONSE_TYPE_R1, r);
 }
 
-/* ACMD41 loop (HCS=1) */
 static sd_error_t sd_acmd41(sd_card_t *card, uint32_t *ocr_out)
 {
     uint32_t r[4];
 
-    /* CMD55 + ACMD41 hasta que OCR[31]=1 (busy=ready) */
     for (uint32_t i = 0; i < 100000; i++)
     {
         sd_error_t e = sd_cmd55(card, r);
         if (e != SD_OK) return e;
 
-        /* Argumento típico: HCS (bit 30) para pedir SDHC si soporta.
-           También podrías setear bits de voltaje. */
         e = sd_cmd(41, 0x40000000u, SDHC_RESPONSE_TYPE_R3, r);
         if (e != SD_OK) return e;
 
-        uint32_t ocr = r[0];                 // en R3, OCR suele venir en response[0]
+        uint32_t ocr = r[0];                
         if (ocr_out) *ocr_out = ocr;
 
         if (ocr & 0x80000000u) {            // busy cleared (ready)
@@ -94,29 +86,21 @@ sd_error_t sd_init(sd_card_t *card)
     card->is_sdhc = false;
     card->ocr  = 0;
 
-    // 1) CMD0: reset a IDLE
-//    sdhc_error_t e = sd_send_cmd(SD_CMD_GO_IDLE_STATE, 0, SDHC_RESPONSE_TYPE_NONE, NULL);
+    //CMD0: reset a IDLE
     sdhc_error_t e = sd_send_cmd0_with_retry();
     if (e != SDHC_ERROR_OK) return sd_map_sdhc_err(e);
 
-    // 2) CMD8: interfaz/voltaje + check pattern (R7)
-    // Arg típico: VHS=0x1 (2.7–3.6V) y check pattern 0xAA
+    //CMD8: interfaz/voltaje + check pattern (R7)
     sdhc_command_t cmd8 = {0};
     e = sd_send_cmd(SD_CMD_SEND_IF_COND, 0x000001AAu, SDHC_RESPONSE_TYPE_R7, &cmd8);
     if (e != SDHC_ERROR_OK) return sd_map_sdhc_err(e);
 
-//    if ( (cmd8.response[0] & 0xFFu) != 0xAAu ) {
-        // Si esto falla, puede ser tarjeta vieja (no SD v2.0).
-//        return SDHC_ERROR_UNSUPPORTED;
-//    }
-
-    // 3) ACMD41 (con CMD55 antes): negociación de OCR y “ready”
-    // HCS (bit 30) = 1 para pedir High Capacity si la tarjeta soporta (SD v2)
-    // Voltage window: típicamente 2.7–3.6V (bits 20..15), acá lo pedimos en conjunto usual: 0x00FF8000
+    //ACMD41: negociación de OCR
+    //HCS= 1 para pedir High Capacity si la tarjeta soporta (SD v2)
     const uint32_t ACMD41_ARG = 0x40000000u | 0x00FF8000u; // HCS | VDD window
     sdhc_command_t acmd41 = {0};
 
-    // Loop con timeout por cantidad de intentos (no te cuelgues)
+    // Loop con timeout por cantidad de intentos
     for (uint32_t i = 0; i < 100000u; i++)
     {
         e = sd_send_acmd(0, SD_ACMD_SD_SEND_OP_COND, ACMD41_ARG, SDHC_RESPONSE_TYPE_R3, &acmd41);

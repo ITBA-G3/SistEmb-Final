@@ -24,7 +24,7 @@
 #include <stddef.h>
 #include "Audio.h"
 
-#define FFT_N 1024u  // power of two
+#define FFT_N 1024u
 
 /**
  * @brief Initialize the FFT processing module.

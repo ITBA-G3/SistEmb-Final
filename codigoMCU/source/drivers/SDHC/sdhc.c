@@ -24,14 +24,6 @@
 #define SDHC_DCLK_PIN		PORTNUM2PIN(PE, 2)
 #define SDHC_SWITCH_PIN		PORTNUM2PIN(PE, 6)
 
-// SDHC declaring PCR configuration for each pin
-//#define SDHC_CMD_PCR		PORT_PCR_MUX(4)
-//#define SDHC_DCLK_PCR		PORT_PCR_MUX(4)
-//#define SDHC_D0_PCR			PORT_PCR_MUX(4)
-//#define SDHC_D1_PCR			PORT_PCR_MUX(4)
-//#define SDHC_D2_PCR			PORT_PCR_MUX(4)
-//#define SDHC_D3_PCR			PORT_PCR_MUX(4)
-
 #define SDHC_CMD_PCR  (PORT_PCR_MUX(4) | PORT_PCR_PE_MASK | PORT_PCR_PS_MASK | PORT_PCR_DSE_MASK)
 #define SDHC_D0_PCR   (PORT_PCR_MUX(4) | PORT_PCR_PE_MASK | PORT_PCR_PS_MASK | PORT_PCR_DSE_MASK)
 #define SDHC_D1_PCR   (PORT_PCR_MUX(4) | PORT_PCR_PE_MASK | PORT_PCR_PS_MASK | PORT_PCR_DSE_MASK)
@@ -39,7 +31,6 @@
 #define SDHC_D3_PCR   (PORT_PCR_MUX(4) | PORT_PCR_PE_MASK | PORT_PCR_PS_MASK | PORT_PCR_DSE_MASK)
 
 #define SDHC_DCLK_PCR (PORT_PCR_MUX(4) | PORT_PCR_DSE_MASK)
-
 
 // SDHC possible values for the register fields
 #define SDHC_RESPONSE_LENGTH_NONE	SDHC_XFERTYP_RSPTYP(0b00)
@@ -77,25 +68,21 @@ typedef struct {
 	bool is_available;
 	uint16_t maxBlockSize;
 	sdhc_error_t current_error;
-
-
 	sdhc_data_t* current_data;
 	sdhc_command_t*	current_command;
 
 } sd_status_t;
 
 typedef struct {
-    uint32_t remaining_words;   // palabras de 32b restantes por transferir (total)
-    uint32_t *buf32;            // puntero al buffer (read o write)
+    uint32_t remaining_words;   // 32b words left to transfer
+    uint32_t *buf32;            // pointer to buffer (rd or wr)
     bool is_read;               // true: read (BRR), false: write (BWR)
     bool active;
 } sdhc_cpu_xfer_t;
 
 static sdhc_cpu_xfer_t cpu_xfer = {0};
 
-
-
-/* ===== ADMA2 (solo visible dentro de sdhc.c) ===== */
+//ADMA2
 typedef struct {
     uint32_t attr_len;
     uint32_t addr;
@@ -103,9 +90,9 @@ typedef struct {
 
 #define ADMA2_VALID     (1u << 0)
 #define ADMA2_END       (1u << 1)
-#define ADMA2_ACT_TRAN  (2u << 4)   /* Act = 10b (transfer) */
+#define ADMA2_ACT_TRAN  (2u << 4)
 
-/* 1 descriptor para 1 bloque (512B). Alineación típica requerida por SDHC ADMA2 */
+// 1 descriptor for 1 block (512B)
 static sdhc_adma2_desc_t adma2_desc __attribute__((aligned(32)));
 
 ///*******************************************************************************
@@ -139,7 +126,7 @@ static bool sdhc_prepare_adma2(const sdhc_data_t *data)
 
     void *buf = data->readBuffer ? (void*)data->readBuffer : (void*)data->writeBuffer;
     if (!buf) return false;
-    if (((uintptr_t)buf & 0x3u) != 0u) return false;  // alineación 4B
+    if (((uintptr_t)buf & 0x3u) != 0u) return false;  //4B align
 
     adma2_desc.attr_len =
         ((bytes & 0xFFFFu) << 16) |
@@ -153,15 +140,15 @@ static bool sdhc_prepare_adma2(const sdhc_data_t *data)
     return true;
 }
 
-
-
 void sdhc_enable_clocks_and_pins(void)
 {
 	SYSMPU->CESR = 0; //disable memory protection unit
+
 	// Initialization of GPIO peripheral to detect switch
 	gpioMode(SDHC_SWITCH_PIN, INPUT_PULLUP);
-	gpioIRQ(SDHC_SWITCH_PIN, GPIO_IRQ_MODE_BOTH_EDGES, SDHC_CardDetectedHandler);
-    /* habilitar reloj al SDHC y al PORT E */
+	gpioIRQ(SDHC_SWITCH_PIN, GPIO_IRQ_MODE_BOTH_EDGES, SDHC_CardDetectedHandler)
+	;
+    //set SDHC and PORT E clocks
 	SIM->SCGC3 = (SIM->SCGC3 & ~SIM_SCGC3_SDHC_MASK)  | SIM_SCGC3_SDHC(1);
 	SIM->SCGC5 = (SIM->SCGC5 & ~SIM_SCGC5_PORTE_MASK) | SIM_SCGC5_PORTE(1);
 
@@ -172,29 +159,21 @@ void sdhc_enable_clocks_and_pins(void)
 	PORTE->PCR[PIN2NUM(SDHC_D2_PIN)] = SDHC_D2_PCR;
 	PORTE->PCR[PIN2NUM(SDHC_D3_PIN)] = SDHC_D3_PCR;
 
-    // Disable the automatically gating off of the peripheral's clock, hardware and other
-//	SDHC->SYSCTL = (SDHC->SYSCTL & ~SDHC_SYSCTL_PEREN_MASK) | SDHC_SYSCTL_PEREN(1);
-//	SDHC->SYSCTL = (SDHC->SYSCTL & ~SDHC_SYSCTL_HCKEN_MASK
-//			) | SDHC_SYSCTL_HCKEN(1);
-//	SDHC->SYSCTL = (SDHC->SYSCTL & ~SDHC_SYSCTL_IPGEN_MASK) | SDHC_SYSCTL_IPGEN(1);
-
-
-	/* Disable all clock auto gated off feature because of DAT0 line logic(card buffer full status) can't be updated
-	    correctly when clock auto gated off is enabled. */
+	// Disable all clock auto gated off feature because of DAT0 line logic
 	SDHC->SYSCTL |= (SDHC_SYSCTL_PEREN_MASK | SDHC_SYSCTL_HCKEN_MASK | SDHC_SYSCTL_IPGEN_MASK);
 
 	// Disable the peripheral clocking, sets the divisor and prescaler for the new target frequency
 	// and configures the new value for the time-out delay. Finally, enables the clock again.
 	SDHC->SYSCTL = (SDHC->SYSCTL & ~SDHC_SYSCTL_DTOCV_MASK)   | SDHC_SYSCTL_DTOCV(0b1110);
-
-	sdhcSetClock(400000U);
+ 
+	sdhcSetClock(400000U);//400k to init SD card
 
 	// Disable interrupts and clear all flags
 	SDHC->IRQSTATEN = 0;
 	SDHC->IRQSIGEN = 0;
 	SDHC->IRQSTAT = 0xFFFFFFFF;
 
-	// Enable interrupts, signals and NVIC
+	// Enable interrupts
 	SDHC->IRQSTATEN = (
 			SDHC_IRQSTATEN_CCSEN_MASK 		| SDHC_IRQSTATEN_TCSEN_MASK 	| SDHC_IRQSTATEN_BGESEN_MASK 	| SDHC_IRQSTATEN_DMAESEN_MASK 	|
 			SDHC_IRQSTATEN_CTOESEN_MASK 	| SDHC_IRQSTATEN_CCESEN_MASK 	| SDHC_IRQSTATEN_CEBESEN_MASK	| SDHC_IRQSTATEN_CIESEN_MASK	|
@@ -205,11 +184,11 @@ void sdhc_enable_clocks_and_pins(void)
 			SDHC_IRQSIGEN_CCIEN_MASK 	| SDHC_IRQSIGEN_TCIEN_MASK 		| SDHC_IRQSIGEN_BGEIEN_MASK 	| SDHC_IRQSIGEN_CTOEIEN_MASK 	|
 			SDHC_IRQSIGEN_CCEIEN_MASK 	| SDHC_IRQSIGEN_CEBEIEN_MASK 	| SDHC_IRQSIGEN_CIEIEN_MASK 	| SDHC_IRQSIGEN_DTOEIEN_MASK 	|
 			SDHC_IRQSIGEN_DCEIEN_MASK 	| SDHC_IRQSIGEN_DEBEIEN_MASK 	| SDHC_IRQSIGEN_AC12EIEN_MASK	| SDHC_IRQSIGEN_DMAEIEN_MASK);
-	// Endianness + bus width = 1-bit fijo
+	// Endianness + bus width = 1-bit
 	SDHC->PROCTL &= ~(SDHC_PROCTL_EMODE_MASK | SDHC_PROCTL_DTW_MASK);
 	SDHC->PROCTL |=  SDHC_PROCTL_EMODE(2)     // 10b = little endian
 	               | SDHC_PROCTL_DTW(0);      // 00b = 1-bit bus
-	SDHC->PROCTL |= SDHC_PROCTL_CDSS_MASK | SDHC_PROCTL_CDTL_MASK;  // “card inserted” por soft
+	SDHC->PROCTL |= SDHC_PROCTL_CDSS_MASK | SDHC_PROCTL_CDTL_MASK;  // “card inserted” by soft
 	SDHC->PROCTL &= ~SDHC_PROCTL_D3CD_MASK;
 	NVIC_EnableIRQ(SDHC_IRQn);
 	status_init();
@@ -243,133 +222,6 @@ void sdhc_reset(sdhc_reset_t reset_type)
 	}
 }
 
-
-// SULLI
-//bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data)
-//{
-//
-//	uint32_t	flags = 0;
-//
-//	if(sdhc_status.is_available)
-//	{
-//		if (!(SDHC->PRSSTAT & SDHC_PRSSTAT_CDIHB_MASK) && !(SDHC->PRSSTAT & SDHC_PRSSTAT_CIHB_MASK))
-//		{
-//			sdhc_status.is_available = false;
-//			sdhc_status.transfer_completed = false;
-//			sdhc_status.current_error = SDHC_ERROR_OK;
-//
-//			sdhc_status.current_command = command;
-//			sdhc_status.current_data    = data;
-//
-//			if(command)
-//			{
-//				switch (command->responseType)
-//				{
-//					case SDHC_RESPONSE_TYPE_NONE:
-//						flags |= SDHC_RESPONSE_LENGTH_NONE;
-//						break;
-//					case SDHC_RESPONSE_TYPE_R1:
-//						flags |= (SDHC_RESPONSE_LENGTH_48 | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
-//						break;
-//					case SDHC_RESPONSE_TYPE_R1b:
-//						flags |= (SDHC_RESPONSE_LENGTH_48BUSY | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
-//						break;
-//					case SDHC_RESPONSE_TYPE_R2:
-//						flags |= (SDHC_RESPONSE_LENGTH_136 | SDHC_COMMAND_CHECK_CCR);
-//						break;
-//					case SDHC_RESPONSE_TYPE_R3:
-//						flags |= (SDHC_RESPONSE_LENGTH_48);
-//						break;
-//					case SDHC_RESPONSE_TYPE_R4:
-//						flags |= (SDHC_RESPONSE_LENGTH_48);
-//						break;
-//					case SDHC_RESPONSE_TYPE_R5:
-//						flags |= (SDHC_RESPONSE_LENGTH_48 | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
-//						break;
-//					case SDHC_RESPONSE_TYPE_R5b:
-//						flags |= (SDHC_RESPONSE_LENGTH_48BUSY | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
-//						break;
-//					case SDHC_RESPONSE_TYPE_R6:
-//						flags |= (SDHC_RESPONSE_LENGTH_48 | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
-//						break;
-//					case SDHC_RESPONSE_TYPE_R7:
-//						flags |= (SDHC_RESPONSE_LENGTH_48 | SDHC_COMMAND_CHECK_CCR | SDHC_COMMAND_CHECK_INDEX);
-//						break;
-//					default:
-//						break;
-//				}
-//				// Set the command type, index and argument
-//				flags |= SDHC_XFERTYP_CMDINX(command->index);
-//				flags |= SDHC_XFERTYP_CMDTYP(command->commandType);
-//				SDHC->CMDARG = command->argument;
-//			}
-//
-//			if(data)
-//			{
-//				// WORD ALIGNMENT
-//				if (data->blockSize % sizeof(uint32_t) != 0U)
-//				{
-//					data->blockSize += sizeof(uint32_t) - (data->blockSize % sizeof(uint32_t));
-//				}
-//
-//				// Set block size and block count
-//				SDHC->BLKATTR = (SDHC->BLKATTR & ~(SDHC_BLKATTR_BLKSIZE_MASK | SDHC_BLKATTR_BLKCNT_MASK)) | SDHC_BLKATTR_BLKCNT(data->blockCount)  | SDHC_BLKATTR_BLKSIZE(data->blockSize);
-//
-//				// Sets the transferring mode selected by the user
-//				SDHC->IRQSTATEN = (SDHC->IRQSTATEN & ~SDHC_IRQSTATEN_BRRSEN_MASK) | SDHC_IRQSTATEN_BRRSEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b1 : 0b0);
-//				SDHC->IRQSTATEN = (SDHC->IRQSTATEN & ~SDHC_IRQSTATEN_BWRSEN_MASK) | SDHC_IRQSTATEN_BWRSEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b1 : 0b0);
-//				SDHC->IRQSTATEN = (SDHC->IRQSTATEN & ~SDHC_IRQSTATEN_DINTSEN_MASK) | SDHC_IRQSTATEN_DINTSEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b0 : 0b1);
-//				SDHC->IRQSIGEN = (SDHC->IRQSIGEN & ~SDHC_IRQSIGEN_BRRIEN_MASK) | SDHC_IRQSIGEN_BRRIEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b1 : 0b0);
-//				SDHC->IRQSIGEN = (SDHC->IRQSIGEN & ~SDHC_IRQSIGEN_BWRIEN_MASK) | SDHC_IRQSIGEN_BWRIEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b1 : 0b0);
-//				SDHC->IRQSIGEN = (SDHC->IRQSIGEN & ~SDHC_IRQSIGEN_DINTIEN_MASK) | SDHC_IRQSIGEN_DINTIEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b0 : 0b1);
-//				if (data->transferMode != SDHC_TRANSFER_MODE_CPU)
-//				{
-//					SDHC->PROCTL = (SDHC->PROCTL & ~SDHC_PROCTL_DMAS_MASK) | SDHC_PROCTL_DMAS(data->transferMode);
-//				}
-//
-//				// Set the data present flag
-//				flags |= SDHC_XFERTYP_DPSEL_MASK;
-//				flags |= SDHC_XFERTYP_DTDSEL(data->readBuffer ? 0b1 : 0b0);
-//				flags |= SDHC_XFERTYP_MSBSEL(data->blockCount > 1 ? 0b1 : 0b0);
-//				flags |= SDHC_XFERTYP_AC12EN(data->blockCount > 1 ? 0b1 : 0b0);
-//				flags |= SDHC_XFERTYP_BCEN(data->blockCount > 1 ? 0b1 : 0b0);
-//				flags |= SDHC_XFERTYP_DMAEN(data->transferMode == SDHC_TRANSFER_MODE_CPU ? 0b0 : 0b1);
-//			}
-//
-//			//todo: FALTA HACER LA PARTE DE DMA
-//		}
-//	}
-//
-////	base->BLKATTR = ((base->BLKATTR & ~(SDHC_BLKATTR_BLKSIZE_MASK | SDHC_BLKATTR_BLKCNT_MASK)) |
-////	                     (SDHC_BLKATTR_BLKSIZE(config->dataBlockSize) | SDHC_BLKATTR_BLKCNT(config->dataBlockCount)));
-////	    base->CMDARG  = config->commandArgument;
-////	    base->XFERTYP = (((config->commandIndex << SDHC_XFERTYP_CMDINX_SHIFT) & SDHC_XFERTYP_CMDINX_MASK) |
-////	                     (config->flags & (SDHC_XFERTYP_DMAEN_MASK | SDHC_XFERTYP_MSBSEL_MASK | SDHC_XFERTYP_DPSEL_MASK |
-////	                                       SDHC_XFERTYP_CMDTYP_MASK | SDHC_XFERTYP_BCEN_MASK | SDHC_XFERTYP_CICEN_MASK |
-////	                                       SDHC_XFERTYP_CCCEN_MASK | SDHC_XFERTYP_RSPTYP_MASK | SDHC_XFERTYP_DTDSEL_MASK |
-////	                                       SDHC_XFERTYP_AC12EN_MASK)));
-//
-//	if(data)
-//	{
-//		SDHC->BLKATTR = ((SDHC->BLKATTR & ~(SDHC_BLKATTR_BLKSIZE_MASK | SDHC_BLKATTR_BLKCNT_MASK)) |
-//				(SDHC_BLKATTR_BLKSIZE(data->blockSize) | SDHC_BLKATTR_BLKCNT(data->blockCount)));
-//	}
-//	else
-//	{
-//		SDHC->BLKATTR = ((SDHC->BLKATTR & ~(SDHC_BLKATTR_BLKSIZE_MASK | SDHC_BLKATTR_BLKCNT_MASK)) |
-//						(SDHC_BLKATTR_BLKSIZE(0x00U) | SDHC_BLKATTR_BLKCNT(0x00U)));
-//	}
-//	SDHC->CMDARG = command->argument;
-//	SDHC->XFERTYP = (((command->index << SDHC_XFERTYP_CMDINX_SHIFT) & SDHC_XFERTYP_CMDINX_MASK) |
-//					 (flags & (SDHC_XFERTYP_DMAEN_MASK | SDHC_XFERTYP_MSBSEL_MASK | SDHC_XFERTYP_DPSEL_MASK |
-//									   SDHC_XFERTYP_CMDTYP_MASK | SDHC_XFERTYP_BCEN_MASK | SDHC_XFERTYP_CICEN_MASK |
-//									   SDHC_XFERTYP_CCCEN_MASK | SDHC_XFERTYP_RSPTYP_MASK | SDHC_XFERTYP_DTDSEL_MASK |
-//									   SDHC_XFERTYP_AC12EN_MASK)));
-//	return true;
-//}
-
-
-// CHAT
 bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data)
 {
     uint32_t flags = 0;
@@ -382,7 +234,7 @@ bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data)
         return false;
     }
 
-    /* Esperar a que el host no esté inhibido (RM: poll CIHB/CDIHB) */
+    //wait for command inhibit (RM: poll CIHB/CDIHB)
     uint32_t timeout = 0xFFFFFF;
     while (timeout--) {
         uint32_t prs = SDHC->PRSSTAT;
@@ -396,14 +248,13 @@ bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data)
         return false;
     }
 
-    /* A partir de acá es seguro programar y disparar */
     sdhc_status.is_available = false;
     sdhc_status.transfer_completed = false;
     sdhc_status.current_error = SDHC_ERROR_OK;
     sdhc_status.current_command = command;
     sdhc_status.current_data    = data;
 
-    /* --- Response flags --- */
+	//set flags
     switch (command->responseType)
     {
         case SDHC_RESPONSE_TYPE_NONE:
@@ -434,16 +285,13 @@ bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data)
             break;
     }
 
-    /* Command index/type + argument */
+    //Command index/type + argument registers
     flags |= SDHC_XFERTYP_CMDINX(command->index);
     flags |= SDHC_XFERTYP_CMDTYP(command->commandType);
 
-    /* Data path setup (si corresponde) */
+    // Data path setup
     if (data)
     {
-        /* No “alinear” el blockSize a palabra (esto cambia el tamaño real del bloque!)
-           Para SD, el bloque es 512 bytes. NO lo modifiques acá. */
-
         SDHC->BLKATTR =
             (SDHC->BLKATTR & ~(SDHC_BLKATTR_BLKSIZE_MASK | SDHC_BLKATTR_BLKCNT_MASK)) |
             SDHC_BLKATTR_BLKCNT(data->blockCount) |
@@ -483,7 +331,7 @@ bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data)
             cpu_xfer.buf32 = (uint32_t*)(cpu_xfer.is_read ? (void*)data->readBuffer : (void*)data->writeBuffer);
             cpu_xfer.active = true;
 
-            /* Requisito práctico: buffers alineados a 4 bytes para DATPORT */
+            // from refference manual, recommended 4-bytes aligned buffers for DATPORT
             if ((cpu_xfer.buf32 == NULL) || (((uintptr_t)cpu_xfer.buf32 & 0x3u) != 0u) || ((total_bytes & 0x3u) != 0u)) {
                 sdhc_status.current_error = SDHC_ERROR_DATA;
                 sdhc_status.is_available = true;
@@ -492,7 +340,7 @@ bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data)
             }
 
             if (!cpu_xfer.is_read) {
-                /* 32 words = 128 bytes por interrupción */
+                // 32 words = 128 bytes each interruption
             	SDHC->WML = (SDHC->WML & ~SDHC_WML_RDWML_MASK) | SDHC_WML_RDWML(32);
             } else {
             	SDHC->WML = (SDHC->WML & ~SDHC_WML_RDWML_MASK) | SDHC_WML_RDWML(32);
@@ -510,7 +358,6 @@ bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data)
             (SDHC->BLKATTR & ~(SDHC_BLKATTR_BLKSIZE_MASK | SDHC_BLKATTR_BLKCNT_MASK));
     }
 
-
     // ADMA
     if (data && data->transferMode == SDHC_TRANSFER_MODE_ADMA2) {
         if (!sdhc_prepare_adma2(data)) {
@@ -525,10 +372,8 @@ bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data)
     	SDHC->IRQSIGEN |= SDHC_IRQSIGEN_TCIEN_MASK;
     }
 
-    /* Limpio status antes de disparar (recomendado) */
     SDHC->IRQSTAT = 0xFFFFFFFF;
-
-    /* Ahora sí disparo */
+	//trigger
     SDHC->CMDARG = command->argument;
     SDHC->XFERTYP =
         (((command->index << SDHC_XFERTYP_CMDINX_SHIFT) & SDHC_XFERTYP_CMDINX_MASK) |
@@ -536,9 +381,6 @@ bool sdhc_start_transfer(sdhc_command_t* command, sdhc_data_t* data)
                    SDHC_XFERTYP_CMDTYP_MASK | SDHC_XFERTYP_BCEN_MASK  | SDHC_XFERTYP_CICEN_MASK |
                    SDHC_XFERTYP_CCCEN_MASK | SDHC_XFERTYP_RSPTYP_MASK | SDHC_XFERTYP_DTDSEL_MASK |
                    SDHC_XFERTYP_AC12EN_MASK)));
-
-    // LA PARTE DE DMA
-
 
     return true;
 }
@@ -549,7 +391,7 @@ sdhc_error_t sdhc_transfer(sdhc_command_t* command, sdhc_data_t* data)
 {
 	sdhc_error_t error = SDHC_ERROR_OK;
 	bool forceExit = false;
-	SDHC->IRQSTAT = 0xFFFFFFFF; //intento de limpiar las flags
+	SDHC->IRQSTAT = 0xFFFFFFFF; //flag clear
     SDHC->PROCTL = ((SDHC->PROCTL & ~SDHC_PROCTL_DTW_MASK) | SDHC_PROCTL_DTW(0b00));
 
 
@@ -656,11 +498,8 @@ static uint32_t computeFrequency(uint8_t prescaler, uint8_t divisor)
 	return SDHC_CLOCK_FREQUENCY / (prescaler * divisor);
 }
 
-/* Soft reset y configuración básica del SDHC (setea clocks en SYSCTL para identificación).
-   Ajustá SDCLKFS/DVS si querés valores específicos (RM muestra la fórmula). */
 void sdhc_soft_reset_all(void)
 {
-    // Reset y limpiar IRQ
     SDHC->SYSCTL |= SDHC_SYSCTL_RSTA_MASK;
     while (SDHC->SYSCTL & SDHC_SYSCTL_RSTA_MASK) {}
     SDHC->IRQSTAT = 0xFFFFFFFFu;
@@ -711,15 +550,11 @@ static void SDHC_TransferErrorHandler(uint32_t status)
 
 	sdhc_status.current_error = error;
 	SDHC->IRQSTAT = 0xFFFFFFFF;
-//	if (context.onTransferError)
-//	{
-//		context.onTransferError(error);
-//	}
 }
 
 static void SDHC_CommandCompletedHandler(uint32_t status)
 {
-	// The command transfer has been completed, fetch the response if there is one
+	//The command transfer has been completed, fetch the response if there is one
 	if (sdhc_status.current_command->responseType != SDHC_RESPONSE_TYPE_NONE)
 	{
 		sdhc_status.current_command->response[0] = SDHC->CMDRSP[0];
@@ -730,7 +565,7 @@ static void SDHC_CommandCompletedHandler(uint32_t status)
 
 	if (sdhc_status.current_data == NULL)
 	{
-		// Notify or raise the transfer completed flag
+		//raise the transfer completed flag
 		sdhc_status.is_available = true;
 		sdhc_status.transfer_completed = true;
 	}
@@ -739,7 +574,6 @@ static void SDHC_CommandCompletedHandler(uint32_t status)
 
 static void SDHC_TransferCompletedHandler(uint32_t status)
 {
-	// Notify or raise the transfer completed flag
 	sdhc_status.is_available = true;
 	sdhc_status.transfer_completed = true;
 	SDHC->IRQSTAT |= SDHC_IRQSTAT_TC_MASK;
@@ -777,7 +611,6 @@ static void status_init(void)
 static void SDHC_DataHandler(uint32_t status)
 {
     if (!cpu_xfer.active || (sdhc_status.current_data == NULL)) {
-        /* Si entra BRR/BWR sin estado válido, abortá prolijamente */
         sdhc_status.current_error = SDHC_ERROR_DATA;
         sdhc_status.is_available = true;
         cpu_xfer.active = false;
@@ -785,10 +618,8 @@ static void SDHC_DataHandler(uint32_t status)
         return;
     }
 
-    /* READ path: Buffer Read Ready */
     if ((status & SDHC_IRQSTAT_BRR_MASK) && cpu_xfer.is_read)
     {
-        /* Cuánto leer en esta IRQ: en general watermark words, pero no pasar el total */
         uint32_t chunk = 32u;
         if (cpu_xfer.remaining_words < chunk) chunk = cpu_xfer.remaining_words;
 
@@ -798,11 +629,9 @@ static void SDHC_DataHandler(uint32_t status)
 
         cpu_xfer.remaining_words -= chunk;
 
-        /* W1C para BRR */
         SDHC->IRQSTAT = SDHC_IRQSTAT_BRR_MASK;
     }
 
-    /* WRITE path: Buffer Write Ready */
     if ((status & SDHC_IRQSTAT_BWR_MASK) && !cpu_xfer.is_read)
 	{
 		uint32_t wml = (SDHC->WML & SDHC_WML_WRWML_MASK) >> SDHC_WML_WRWML_SHIFT;
@@ -818,8 +647,6 @@ static void SDHC_DataHandler(uint32_t status)
 		SDHC->IRQSTAT = SDHC_IRQSTAT_BWR_MASK;
 	}
 
-    /* Si ya mandamos/recibimos todo, dejamos que TC cierre la transferencia.
-       No seteamos transfer_completed acá: eso lo hace tu TC handler. */
     if (cpu_xfer.remaining_words == 0u) {
         cpu_xfer.active = false;
     }
@@ -864,7 +691,4 @@ void SDHC_IRQHandler(void)
             SDHC_TransferCompletedHandler(status & SDHC_TRANSFER_COMPLETED_FLAG);
         }
     }
-
-	// Clear all flags raised when entered the service routine
-//	SDHC->IRQSTAT = status;
 }

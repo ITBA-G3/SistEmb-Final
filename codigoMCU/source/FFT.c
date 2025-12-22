@@ -47,7 +47,6 @@ static float    g_window[FFT_N];
 static arm_rfft_fast_instance_f32 g_rfft;
 static uint8_t  g_init_done = 0;
 
-// Working buffers (static = no stack pressure)
 static float g_time[FFT_N];          // real time-domain input
 static float g_freq[FFT_N];          // packed RFFT output
 static float g_mag2[FFT_N/2 + 1];    // magnitude^2 for bins 0..N/2
@@ -142,14 +141,12 @@ void FFT_ComputeBands(const int16_t *pcm, size_t n, uint32_t fs_hz, float out_ba
         return;
     }
 
-    // Subtract mean (DC removal)
     int32_t sum = 0;
     for (uint32_t i = 0; i < FFT_N; i++){
     	sum += pcm[i];
     }
     float mean = (float)sum / (float)FFT_N;
 
-    // Build real input buffer: normalize int16 to [-1..1] and apply window
     const float inv_q15 = 1.0f / 32768.0f;
 
     for (uint32_t i = 0; i < FFT_N; i++) {
@@ -157,13 +154,8 @@ void FFT_ComputeBands(const int16_t *pcm, size_t n, uint32_t fs_hz, float out_ba
             g_time[i] = s * g_window[i];
     }
 
-    // Fast real FFT (packed output)
     arm_rfft_fast_f32(&g_rfft, g_time, g_freq, 0);
 
-    // Compute magnitude^2 for bins 0..N/2 using CMSIS packed format:
-    // k=0:     Re = g_freq[0], Im=0
-    // k=N/2:   Re = g_freq[1], Im=0
-    // k=1..N/2-1: Re = g_freq[2*k], Im = g_freq[2*k+1]
     g_mag2[0] = g_freq[0] * g_freq[0];
     g_mag2[FFT_N/2] = g_freq[1] * g_freq[1];
 
@@ -173,7 +165,6 @@ void FFT_ComputeBands(const int16_t *pcm, size_t n, uint32_t fs_hz, float out_ba
         g_mag2[k] = re * re + im * im;
     }
 
-    // Integrate fixed (static) bin bands (your code unchanged)
     float bands[8] = {0};
 
     for (int b = 0; b < 8; b++) {
@@ -183,43 +174,27 @@ void FFT_ComputeBands(const int16_t *pcm, size_t n, uint32_t fs_hz, float out_ba
         if (k0 < 1) k0 = 1;
         if (k1 > FFT_N/2) k1 = FFT_N/2;
 
-        // guard band, avoid edge leakage a bit
         if (k1 > k0 + 2) { k0 += 1; k1 -= 1; }
 
         float acc = 0.0f;
         for (uint32_t k = k0; k < k1; k++) acc += g_mag2[k];
-
-//        const float inv_len = 1.0f / (float)(k1 - k0);
-//        bands[b] = acc * inv_len; // mean mag^2 in band AVERAGE SPECTRAL POWER DENSITY.
-        bands[b] = acc; // TOTAL ENERGY IN BAND
+        bands[b] = acc;
     }
 
-    // Map to display range (dB mapping)
     const float eps = 1e-20f;
     const float db_min = -50.0f;
     const float db_max = 0.0f;
 
     const float inv_db_span = 1.0f / (db_max - db_min);
-
-    // Normalization factor.
     const float inv_N2 = 1.0f / ((float)FFT_N * (float)FFT_N);
 
     for (int b = 0; b < 8; b++) {
-            // normalize power so amplitude matters
             float p_norm = bands[b] * inv_N2;
-
-            // dBFS-ish mapping (depends on your full signal chain / window / scaling)
             float db = 10.0f * log10f(p_norm + eps);
-
             float e = (db - db_min) * inv_db_span;
-
-            // clamp
             if (e < 0.0f) e = 0.0f;
             if (e > 1.0f) e = 1.0f;
-
-            // noise gate
             if (e < 0.12f) e = 0.0f;
-
             out_bands[b] = e;
     }
 }

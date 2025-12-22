@@ -38,8 +38,6 @@ static volatile bool ws_busy = false;
 static bool ws_build_cnv_buffer(const uint8_t *buf, uint32_t len);
 static void DMA_cb(void);
 
-
-//static uint16_t ws_cnv_buffer[WS_TOTAL_BITS];
 typedef struct {
     uint16_t cnv[WS_TOTAL_BITS];
     uint32_t canary;
@@ -69,13 +67,11 @@ bool WS2_TransportInit(void)
 {
     FTM_Init();
 
-    /* Enable the clock for the PORT C*/
     SIM->SCGC5 |= SIM_SCGC5_PORTC_MASK;
 
-    // DMA Periodic Trigger Mode: DMA channels 0-3
     DMA_Init();
     // Every FTM overflow, a DMA minor loop transfer is triggered.
-    DMAMUX_ConfigChannel(DMA_CH0, true, false, kDmaRequestMux0FTM0Channel0);     // FTM TOF --> DMAMUX --> DMA --> copies next CnV to FTM CnV.
+    DMAMUX_ConfigChannel(DMA_CH0, true, false, kDmaRequestMux0FTM0Channel0);     
 
     DMA_SetSourceAddr(DMA_CH0, (uint32_t)(&ws_cnv_buffer[0]));   // dirección de la fuente de datos
     DMA_SetDestAddr(DMA_CH0, (uint32_t)&FTM0->CONTROLS[0].CnV);     // dirección de destino (FTM0 CnV)
@@ -92,7 +88,7 @@ bool WS2_TransportInit(void)
 
     DMA_SetChannelInterrupt(DMA_CH0, true, DMA_cb);
 
-    DMA0->TCD[DMA_CH0].CSR |= DMA_CSR_DREQ_MASK; // auto-disable request al terminar major loop
+    DMA0->TCD[DMA_CH0].CSR |= DMA_CSR_DREQ_MASK;
 
     return true;
 }
@@ -127,13 +123,13 @@ static bool ws_build_cnv_buffer(const uint8_t *buf, uint32_t len)
 {
     if (!buf) return false;
 
-    const uint32_t max_bytes = WS_NUM_LEDS * 3;   // 192
-    if (len < max_bytes) return false;            // strict
-    if (len > max_bytes) len = max_bytes;         // clamp (optional)
+    const uint32_t max_bytes = WS_NUM_LEDS * 3; 
+    if (len < max_bytes) return false;          
+    if (len > max_bytes) len = max_bytes;     
 
     uint32_t bit_idx = 0;
 
-    for (uint32_t i = 0; i < 192; i++) {          // start at 0, not 3
+    for (uint32_t i = 0; i < 192; i++) {      
         uint8_t byte = buf[i];
         for (int bit = 7; bit >= 0; --bit) {
             if (bit_idx >= (WS_TOTAL_BITS - WS_RESET_BITS)) return false;

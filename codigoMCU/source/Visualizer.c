@@ -30,22 +30,21 @@
  * @return RGB color corresponding to the given level.
  */
 static LEDM_color_t color_for_level(int level, int max_level) {
-    // level: 0 abajo, max_level-1 arriba
     float t = (float)level / (float)(max_level - 1);   // 0..1
 
     LEDM_color_t c;
 
     if (t < 0.5f) {
         // de verde a amarillo
-        float u = t / 0.5f;     // 0..1
-        c.r = (uint8_t)(u * 255);   // 0 -> 255
+        float u = t / 0.5f;     
+        c.r = (uint8_t)(u * 255);
         c.g = 255;
         c.b = 0;
     } else {
         // de amarillo a rojo
-        float u = (t - 0.5f) / 0.5f; // 0..1
+        float u = (t - 0.5f) / 0.5f; 
         c.r = 255;
-        c.g = (uint8_t)((1.0f - u) * 255); // 255 -> 0
+        c.g = (uint8_t)((1.0f - u) * 255); 
         c.b = 0;
     }
 
@@ -67,7 +66,7 @@ static int energy_to_height(float e) {
     // redondeo hacia arriba para que se vea algo con energías chicas
     int h = (int)(e * (float)LEDM_MAX_HEIGHT + 0.5f);
     if (h > LEDM_MAX_HEIGHT) h = LEDM_MAX_HEIGHT;
-    return h;   // 0..8
+    return h;
 }
 
 /**
@@ -93,29 +92,4 @@ void Visualizer_DrawBars(const float band_energy[8], LEDM_t* matrix) {
             }
         }
     }
-}
-
-
-/**
- * @brief TESTING PURPOSES: Generates a synthetic animated test frame and draws it using the bar visualizer.
- *
- * Builds 8 phase-shifted sine waves to simulate band energies for testing
- * the visualization pipeline without real FFT input, then calls Visualizer_DrawBars().
- *
- * @param matrix Pointer to the LED matrix instance to draw into.
- */
-void Visualizer_UpdateFrame(LEDM_t* matrix) {
-    static float t = 0.0f;
-    float bands[8];
-
-    for (int i = 0; i < 8; i++) {
-    	// sinuisodales defasadas para test
-        float phase = t + i * 0.7f;
-        float val = 0.5f + 0.5f * sinf(phase);
-        bands[i] = val;
-    }
-
-    t += 0.25f; // velocidad del movimiento
-
-    Visualizer_DrawBars(bands, matrix);
 }

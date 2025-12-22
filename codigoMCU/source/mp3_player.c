@@ -50,7 +50,6 @@ volatile uint32_t g_mp3_frames_ok   = 0;
 static uint32_t pcm_ring_push_left_block(const int16_t *pcm, uint32_t interleaved_samps, uint32_t *io_idx);
 static inline void pcm_ring_snapshot(uint32_t *rd, uint32_t *wr);
 
-// --- ID3v2 skip (recomendado) ---
 static bool mp3_skip_id3v2(FIL *fp)
 {
     UINT br = 0;
@@ -212,12 +211,9 @@ bool MP3Player_DecodeAsMuchAsPossibleToRing(void)
 
         // 2) Si NO hay PCM pendiente, decodificar un frame nuevo
         if (g_pcm_idx >= g_pcm_total) {
-//        	gpioWrite(PORTNUM2PIN(PC,11),HIGH);
             if (!mp3_decode_next_frame()) {
                 return progressed ? true : false;
             }
-//            gpioWrite(PORTNUM2PIN(PC,11),LOW);
-            // mp3_decode_next_frame() deja g_pcm_total y g_pcm_idx=0
         }
 
         // 3) Empujar PCM pendiente del frame actual
@@ -238,9 +234,6 @@ bool MP3Player_DecodeAsMuchAsPossibleToRing(void)
 
         // Si no pudiste empujar nada, ring lleno (o algo raro): cortar
         if ((uint32_t)g_pcm_idx == before) return progressed;
-
-        // Opcional: no monopolizar CPU
-        // break; o OSTimeDly(1) fuera, según tu arquitectura
     }
 }
 
@@ -293,14 +286,6 @@ uint32_t pcm_ring_free(void)
     return (uint32_t)(PCM_RING_SIZE - (wr - rd));
 }
 
-
-// static bool pcm_ring_push(int16_t s)
-// {
-//     if (pcm_ring_free() == 0) return false;
-//     g_pcm_ring[g_pcm_wr & PCM_RING_MASK] = s;
-//     g_pcm_wr++;
-//     return true;
-// }
 void pcm_ring_clear(void)
 {
     g_pcm_wr = 0;
@@ -318,7 +303,7 @@ uint32_t pcm_ring_pop_block(volatile uint16_t *dst, uint32_t n)
     wr = g_pcm_wr;
     __enable_irq();
 
-    uint32_t avail = (wr - rd);            // asumiendo indices crecientes
+    uint32_t avail = (wr - rd);           
     if (n > avail) n = avail;
 
     for (uint32_t i = 0; i < n; i++) {

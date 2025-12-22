@@ -10,7 +10,7 @@
 
 #define PWM_CLK 800E3
 #define FTM_CLK 50E6
-#define FTM_MOD (FTM_CLK/PWM_CLK - 1)      // x es frecuencia del reloj del FTM
+#define FTM_MOD (FTM_CLK/PWM_CLK - 1)
 
 // Set FTM as PWM to drive WS2812
 void FTM_Init(void)
@@ -18,13 +18,11 @@ void FTM_Init(void)
     // Enable FTM modules clock
 	SIM->SCGC6 |= SIM_SCGC6_FTM0_MASK;
 
-	// NVIC_EnableIRQ(FTM0_IRQn);		// OFF FOR FTM+bitbanging test
-
     // PTC 1 as PWM output
 	PORTC->PCR[1] = PORT_PCR_MUX(PORT_mAlt4) | PORT_PCR_DSE(true) | PORT_PCR_IRQC(PORT_eDisabled);
 
     // Set default prescaler to 1
-    FTM_SetPrescaler(FTM0, FTM_PSC_x1);     // Periodo = 1/60MHz * (MOD + 1) * Prescaler
+    FTM_SetPrescaler(FTM0, FTM_PSC_x1);
 
     FTM_SetInterruptMode(FTM0, FTM_CH_0, false);
     FTM_SetWorkingMode(FTM0, FTM_CH_0, FTM_mPulseWidthModulation);  
@@ -36,13 +34,9 @@ void FTM_Init(void)
 
     FTM_SetCnV(FTM0, FTM_CH_0, CNV_0);
 
-    // Enable DMA Request
-//    FTM_DMAMode(FTM0, FTM_CH_0, true);
     FTM0->CONTROLS[0].CnSC |= FTM_CnSC_DMA_MASK;
 
-    // Ensure channel flag is enabled to generate events
-    FTM0->CONTROLS[0].CnSC |= FTM_CnSC_CHIE_MASK;  // optional but helps debugging
-//    FTM_StartClock(FTM0);
+    FTM0->CONTROLS[0].CnSC |= FTM_CnSC_CHIE_MASK;
 }
 
 

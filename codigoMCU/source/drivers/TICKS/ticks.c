@@ -11,12 +11,11 @@ typedef struct
 static pisr_callback_t callbacks[MAX_FUNCTIONS];
 static uint32_t index = 0;
 
+/*******************************************************************************
+* FUNCTION WITH GLOBAL SCOPE
+******************************************************************************/
 
- /*******************************************************************************
- * FUNCTION WITH GLOBAL SCOPE
- ******************************************************************************/
-
-void App_OS_SetAllHooks (void)                             /* os_app_hooks.c         */
+void App_OS_SetAllHooks (void)           
 {
     CPU_SR_ALLOC();
     CPU_CRITICAL_ENTER();

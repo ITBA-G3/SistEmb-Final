@@ -43,7 +43,7 @@ typedef enum {
 } sdhc_response_type_t;
 
 typedef enum {
-	// Specific errors, driver raises an individual flag for each one
+	//Specific errors
 	SDHC_ERROR_OK			= 0x00000000,
 	SDHC_ERROR_DMA 			= 0x00000001,
 	SDHC_ERROR_AUTO_CMD12 	= 0x00000002,
@@ -62,19 +62,19 @@ typedef enum {
 } sdhc_error_t;
 
 typedef struct {
-	uint8_t					index;			// Index of the command
-	uint32_t				argument;		// Argument of the command
-	sdhc_command_type_t		commandType;	// Type of command
-	sdhc_response_type_t	responseType;	// Type of response expected
-	uint32_t				response[4];	// Response placeholder
+	uint8_t					index;			
+	uint32_t				argument;		
+	sdhc_command_type_t		commandType;
+	sdhc_response_type_t	responseType;
+	uint32_t				response[4];
 } sdhc_command_t;
 
 typedef struct {
-	uint32_t				blockCount;		// Amount of blocks to be sent or received
-	uint32_t				blockSize;		// Size in bytes of each block transfered
-	uint32_t*				writeBuffer;	// Buffer with write data, used only when writing, else should be NULL
-	uint32_t*				readBuffer;		// Buffer for the read data, used only when reading, else should be NULL
-	sdhc_transfer_mode_t	transferMode;	// Data transfer mode
+	uint32_t				blockCount;		
+	uint32_t				blockSize;		
+	uint32_t*				writeBuffer;	
+	uint32_t*				readBuffer;		
+	sdhc_transfer_mode_t	transferMode;
 } sdhc_data_t;
 
 void sdhc_enable_clocks_and_pins(void);

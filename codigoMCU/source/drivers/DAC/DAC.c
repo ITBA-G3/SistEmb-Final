@@ -1,6 +1,6 @@
 /***************************************************************************/ /**
    @file     DAC.c
-   @brief    Driver ADC
+   @brief    Driver DAC
    @author   Grupo 3
   ******************************************************************************/
 
@@ -23,8 +23,6 @@ void DAC_Init (DAC_t dac)
 
 	if(dac == DAC0){
 		dac->C0 = DAC_C0_DACEN_MASK | DAC_C0_DACRFS_MASK ;
-//		dac->C0 = DAC_C0_DACEN_MASK | DAC_C0_DACRFS_MASK  | DAC_C0_DACTRGSEL_MASK;
-//		dac->C1 &= ~(DAC_C1_DMAEN_MASK | DAC_C1_DACBFMD_MASK | DAC_C1_DACBFEN_MASK);
 	}
 	else if(dac == DAC1)			
 		dac->C0 &= ~DAC_C0_DACEN_MASK;
@@ -41,10 +39,6 @@ void DAC_SetData (DAC_t dac, DACData_t data)
 	}
 	DACReady[DACid] = false;
 }
-
-//void DAC_SetHardwareTrigger(DAC_t dac){
-//	dac->C0 &= DAC_C0_DACTRGSEL_MASK; // DACTRGSEL en 0 para indicar hardware trigger
-//}
 
 uint8_t DAC_Ready(DAC_t dac){
 	uint8_t DACid = 0;

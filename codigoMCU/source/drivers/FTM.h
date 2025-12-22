@@ -17,20 +17,10 @@
 #include "hardware.h"
 #include "MK64F12.h"
 
-
-/*------------------------------------------------------------
- * 2) tH (ns) → CnV  dado f_FTM (Hz)
- *    CnV = round( tH * f_FTM )
- *    Útil para WS2812: t0h≈350ns, t1h≈900ns
- *-----------------------------------------------------------*/
 #define FTM_NS_2_CNV(x) ((uint16_t) ( ((uint64_t)(x) * (uint64_t)(50000000UL) + 500000000ULL) / 1000000000ULL ))
-
-//#define CNV_0 (FTM_NS_2_CNV(350)) // 18
-//#define CNV_1 (FTM_NS_2_CNV(900)) // 45
 
 #define CNV_0 19 // 18
 #define CNV_1 (FTM_NS_2_CNV(800)) // 45
-
 
 
 /*******************************************************************************
