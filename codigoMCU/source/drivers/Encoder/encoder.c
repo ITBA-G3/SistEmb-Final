@@ -41,6 +41,7 @@ encoder_btn_event_t getSwitchState(void){
     return event;
 }
 
+
 static void Encoder_Periodic_ISR(void) {
     bool a = !gpioRead(PIN_ENCODER_A);
     bool b = !gpioRead(PIN_ENCODER_B);

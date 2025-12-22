@@ -158,7 +158,8 @@ bool MP3Player_InitWithOpenFile(FIL *fp)
     g_fp = fp;
 
     if (!mp3_skip_id3v2(g_fp)) return false;
-
+    if(g_hmp3)
+        MP3FreeDecoder(g_hmp3);
     g_hmp3 = MP3InitDecoder();
     if (!g_hmp3) return false;
 
@@ -304,6 +305,8 @@ void pcm_ring_clear(void)
 {
     g_pcm_wr = 0;
     g_pcm_rd = 0;
+    g_pcm_idx = 0;
+    g_pcm_total = 0;
 }
 
 uint32_t pcm_ring_pop_block(volatile uint16_t *dst, uint32_t n)
