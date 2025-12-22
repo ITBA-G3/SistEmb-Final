@@ -112,6 +112,8 @@ static OS_SEM DisplaySem;
 static OS_SEM LedFrameSem;
 static OS_SEM g_mp3ReadySem;        // 
 
+volatile OS_SEM g_audioFillSem;
+
 
 
 /*******************************************************************************
@@ -163,6 +165,8 @@ static void App_TaskCreate(void)
                     &err);
 
     OSSemCreate(&g_mp3ReadySem, "mp3_ready", 0, &err);
+
+    OSSemCreate(&g_audioFillSem, "audio_ready", 0, &err);
 
     // Create tasks                
 
@@ -286,9 +290,9 @@ static void Audio_Task(void *p_arg)
         // if (isPlaying)
         // {
             
-    		gpioWrite(PORTNUM2PIN(PC,11), HIGH);
+    		// gpioWrite(PORTNUM2PIN(PC,11), HIGH);
             Audio_Service();
-            gpioWrite(PORTNUM2PIN(PC,11), LOW);
+            // gpioWrite(PORTNUM2PIN(PC,11), LOW);
             if(PIT_trigger){
                 PIT_trigger = false;
             }
