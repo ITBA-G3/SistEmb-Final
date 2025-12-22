@@ -10,7 +10,9 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-
+#include <stddef.h>
+#include "MK64F12.h"
+#include "os.h"
 #include "hardware.h"
 
 #define PIT_FREQ (50E6)
@@ -34,7 +36,7 @@ void PIT_Enable(uint8_t channel);
 
 void PIT_Disable(uint8_t pit);
 
-void PIT_EnableInterrupt(uint8_t pit);
+void PIT_EnableInterrupt(uint8_t pit, uint32_t freq);
 void PIT_DisableInterrupt(uint8_t pit);
 
 void PIT_SetCallback(PIT_Callback_t cb, PIT_MOD pit);

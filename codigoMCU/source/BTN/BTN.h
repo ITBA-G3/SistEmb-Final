@@ -7,7 +7,7 @@
 #ifndef BTN_H
 #define BTN_H
 
-#include "../drivers/PIT.h"
+#include "../drivers/TICKS/ticks.h"
 #include "../board.h"
 #include "../drivers/gpio.h"
 #include <stdbool.h>

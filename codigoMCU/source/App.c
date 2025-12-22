@@ -562,7 +562,7 @@ static void PIT_cb(void)
 {
 	OS_ERR err;
 	OSSemPost(&LedFrameSem, OS_OPT_POST_1, &err);
-//	gpioToggle(PORTNUM2PIN(PC,11));
+	gpioToggle(PORTNUM2PIN(PC,11));
 }
 
 

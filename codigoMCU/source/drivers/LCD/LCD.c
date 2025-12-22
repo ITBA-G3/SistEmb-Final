@@ -8,8 +8,16 @@
 
 static volatile uint32_t TICKS_DELAY_MS = 0;
 
-static void delay_cb(void);
-static void delay_ms(uint32_t ms);
+static void delay_cb(void)
+{
+    TICKS_DELAY_MS++;
+}
+
+static void delay_ms(uint32_t ms)
+{
+    TICKS_DELAY_MS = 0;
+    while (TICKS_DELAY_MS < ms);
+}
 
 typedef struct {
     char* text[2];
@@ -20,11 +28,8 @@ display_t LCD = {{NULL, NULL}, {0, 0}};
 
 void init_LCD (void)
 {
-    gpioMode(PORTNUM2PIN(PE,24), OUTPUT); 
-
     init_I2C();
-    PIT_Init(PIT_3, PIT_TIME(1000)); // 1ms tick
-    PIT_SetCallback(delay_cb, PIT_3);
+    tickAdd(delay_cb, 1);
     delay_ms(40);
 
     uint8_t payload = (uint8_t)(1<<3);
@@ -55,9 +60,8 @@ void init_LCD (void)
     delay_ms(3);
     // display on
     write_byte(0b00001100, 0, 0);
-    delay_ms(3);
+    delay_ms(400);
 
-    // return_home();
     clear_LCD();
     delay_ms(3);  
 }
@@ -203,18 +207,5 @@ void clear_line(uint8_t line)
     for(int i=0; i<DISPLAY_WIDTH; i++)
         write_byte(' ', 0, 1);
     set_cursor_line(line);
-}
-
-static void delay_cb(void)
-{
-    TICKS_DELAY_MS++;
-    gpioToggle(PORTNUM2PIN(PE,24));
-}
-
-static void delay_ms(uint32_t ms)
-{
-    TICKS_DELAY_MS = 0;
-    while (TICKS_DELAY_MS < ms);
-
 }
 

@@ -14,7 +14,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "../I2C/I2C.h"
-#include "../PIT.h"
+#include "../TICKS/ticks.h"
 #include "os.h"
 #include "../gpio.h"
 

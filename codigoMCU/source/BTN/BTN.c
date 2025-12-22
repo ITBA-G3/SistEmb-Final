@@ -15,8 +15,12 @@ void init_user_buttons(void)
     gpioMode(PIN_PREV, INPUT_PULLDOWN);
     gpioMode(PIN_NEXT, INPUT_PULLDOWN);
 
-    PIT_Init(PIT_2, 200);
-    PIT_SetCallback(btn_cb, PIT_2);
+    gpioMode(PORTNUM2PIN(PC,5), OUTPUT); 
+
+    tickAdd(btn_cb, 5);
+    // PIT_Init(PIT_3, 1000);    // PIT3@1kHz
+    // PIT_SetMultCallback(btn_cb, 200);
+
 }
 
 static void btn_cb(void)

@@ -38,7 +38,6 @@ bool tickAdd (pisr_cb_t funcallback, unsigned int period)
 
 void PISR(void)
 {
-    OSIntEnter();
 	static unsigned int counter = 0;
 	for(int i = 0; i < index; i++)
 	{
@@ -48,5 +47,4 @@ void PISR(void)
 		}
 	}
 	counter++;
-    OSIntExit();
 }
