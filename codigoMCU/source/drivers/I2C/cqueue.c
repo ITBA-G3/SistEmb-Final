@@ -3,6 +3,10 @@
  ******************************************************************************/
 
 #include "cqueue.h"
+#include "MK64F12.h" // o lo que uses para __disable_irq/__enable_irq
+
+static inline uint32_t irq_save(void){ uint32_t prim = __get_PRIMASK(); __disable_irq(); return prim; }
+static inline void irq_restore(uint32_t prim){ if(!prim) __enable_irq(); }
 
 /*******************************************************************************
  * CONSTANT AND MACRO DEFINITIONS USING #DEFINE
@@ -47,6 +51,8 @@ void i2c_QueueInit(void)
 */
 unsigned char i2c_PushQueue(dataByte_t data)
 {	
+    uint32_t prim = irq_save();
+
 	if (news > QSIZE-1)		//test for Queue overflow
 	{
 		news=QOVERFLOW;		// inform queue has overflowed
@@ -59,6 +65,7 @@ unsigned char i2c_PushQueue(dataByte_t data)
 	if (pin == buffer+QSIZE)	// if queue size is exceded reset pointer
 		pin=buffer;
 
+    irq_restore(prim);
 	return(news);			// inform Queue state
 }
 
@@ -67,6 +74,8 @@ unsigned char i2c_PushQueue(dataByte_t data)
 */
 unsigned char i2c_PullQueue(void)
 {
+    uint32_t prim = irq_save();
+
 	dataByte_t *data;
 	data=pout;			// Aux data pointer
 	pout++;
@@ -75,6 +84,7 @@ unsigned char i2c_PullQueue(void)
 	if (pout == buffer+QSIZE)	// Check for Queue boundaries
 		pout=buffer;		// if queue size is exceded reset pointer
 
+    irq_restore(prim);
 	return (data->byte);			// rerturn retrieved data
 }
 

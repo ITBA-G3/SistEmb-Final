@@ -29,7 +29,7 @@ typedef enum {
 } encoder_btn_event_t;
 
 // Timing constants
-#define ISR_PERIOD_MS       1
+#define ISR_PERIOD_MS       20
 #define DEBOUNCE_MS         50      // Minimum time to validate a press
 #define LONG_CLICK_MS       1000    // Time threshold for a long click
 
@@ -38,13 +38,6 @@ typedef enum {
 #define STATE_10    0b10
 #define STATE_11    0b11
 
-static uint8_t encoderLastState = 0;
-static int16_t turns = 0;
-
-static uint16_t btn_counter = 0;
-static encoder_btn_event_t btn_status = BTN_NOT;
-
-static void Encoder_Periodic_ISR(void);
 
 /*******************************************************************************
  * FUNCTION PROTOTYPES

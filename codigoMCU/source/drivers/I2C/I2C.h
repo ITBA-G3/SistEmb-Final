@@ -11,37 +11,15 @@
  * INCLUDE HEADER FILES
  ******************************************************************************/
 
-#include "../../SDK/startup/hardware.h"
-#include "../../SDK/CMSIS/MK64F12.h"
- // #include "../pisr.h"
-#include "../TICKS/ticks.h"
+#include <stdint.h>
 #include <stdbool.h>
-#include <stdarg.h>
-
-/*******************************************************************************
-* INCLUDE TYPEDEFS AND ENUMS
-*******************************************************************************/
-        
-enum RX_Status {RX_READY, RX_NOT_READY};
 
 /*******************************************************************************
  * FUNCTION PROTOTYPES WITH GLOBAL SCOPE
  ******************************************************************************/
 
-void init_I2C (void);
+void init_I2C(void);
 
-void kill_I2C (void);
+bool write_I2C(uint8_t address, char *payload, uint8_t size);
 
-bool write_I2C (uint8_t writeAddress, uint8_t* writePayload, uint8_t writeLength);
-
-bool read_I2C (uint8_t slaveAddress, uint8_t dataSize);
-
-void I2C_subroutine (void);
-
-bool isBusBusy(void);
-
-void getData_I2C (unsigned char *arr);
-
-unsigned char getUserQueueLength (void);
-
-#endif//_I2C_H_
+#endif // _I2C_H

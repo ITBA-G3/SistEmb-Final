@@ -110,7 +110,6 @@ void Audio_Init()
     DAC_Init(DAC0);
     DAC_SetData(DAC0, DAC_MID); // midscale
 
-
     // Pre-fill both buffers before starting DMA
 	// Audio_FillSine(bufA, AUDIO_BUF_LEN);
 	// Audio_FillSine(bufB, AUDIO_BUF_LEN);

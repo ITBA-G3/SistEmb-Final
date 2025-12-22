@@ -14,37 +14,53 @@ static GPIO_Type* gpios[] = {GPIOA,GPIOB,GPIOC,GPIOD,GPIOE};
 
 static pin_callback_t IRQ_Callbacks[5][IRQ_CANT] = {0};
 
-void gpioMode (pin_t pin, uint8_t mode) //tengo que poder modificar el PCR y el PDDR del pin que me dan
+void gpioMode(pin_t pin, uint8_t mode)
 {
-	PORT_Type* puerto 	= puertos[PIN2PORT(pin)];
-	GPIO_Type* gpio	 	= gpios[PIN2PORT(pin)];
-	puerto->PCR[PIN2NUM(pin)] |= PORT_PCR_MUX(0x1U); // Tengo que "colocar" al pin en la alternativa GPIO
-	switch (mode)
-	{
-		case INPUT:
-		{
-			gpio->PDDR &= ~(0x1<<PIN2NUM(pin)); //coloco un 0 en el bit que quiero que sea una entrada
-			break;
-		}
-		case OUTPUT:
-		{
-			gpio->PDDR |= (0x1<<PIN2NUM(pin)); //coloco un 1 en el pin que quiero que sea una salida
-			break;
-		}
-		case INPUT_PULLUP:
-		{
-			gpio->PDDR &= ~(0x1<<PIN2NUM(pin));
-			puerto->PCR[PIN2NUM(pin)] |= (PORT_PCR_PS(0x1U) | PORT_PCR_PE(0x1U));//Activo el PE y seteo PS en 1 para que sea PULLUP
-			break;
-		}
-		case INPUT_PULLDOWN:
-		{
-			gpio->PDDR &= ~(0x1<<PIN2NUM(pin));
-			puerto->PCR[PIN2NUM(pin)] |= PORT_PCR_PE(1U);//Activo el PE y seteo PS en 0 para que sea PULLDOWN
-			puerto->PCR[PIN2NUM(pin)] &= PORT_PCR_PS(0U);
-			break;
-		}
-	}
+    uint8_t port = PIN2PORT(pin);
+    uint8_t n    = PIN2NUM(pin);
+
+    switch (port) {
+        case PA: SIM->SCGC5 |= SIM_SCGC5_PORTA_MASK; break;
+        case PB: SIM->SCGC5 |= SIM_SCGC5_PORTB_MASK; break;
+        case PC: SIM->SCGC5 |= SIM_SCGC5_PORTC_MASK; break;
+        case PD: SIM->SCGC5 |= SIM_SCGC5_PORTD_MASK; break;
+        case PE: SIM->SCGC5 |= SIM_SCGC5_PORTE_MASK; break;
+    }
+
+    PORT_Type* p = puertos[port];
+    GPIO_Type* g = gpios[port];
+
+    // Armamos PCR "limpio"
+    uint32_t pcr = 0;
+    pcr |= PORT_PCR_MUX(1);        // GPIO
+    pcr |= PORT_PCR_PE_MASK * 0;   // por defecto sin pull
+    // pcr |= PORT_PCR_PFE_MASK;    // opcional: filtro pasivo p/ botones
+
+    switch (mode) {
+        case INPUT:
+            // sin pull
+            g->PDDR &= ~(1UL << n);
+            // asegurate de deshabilitar pull:
+            // (dejamos PE=0)
+            break;
+
+        case OUTPUT:
+            g->PDDR |= (1UL << n);
+            break;
+
+        case INPUT_PULLUP:
+            g->PDDR &= ~(1UL << n);
+            pcr |= PORT_PCR_PE_MASK | PORT_PCR_PS_MASK;  // pull-up
+            break;
+
+        case INPUT_PULLDOWN:
+            g->PDDR &= ~(1UL << n);
+            pcr |= PORT_PCR_PE_MASK;                     // pull enable
+            pcr &= ~PORT_PCR_PS_MASK;                    // pull-down
+            break;
+    }
+
+    p->PCR[n] = pcr;
 }
 
 void gpioWrite (pin_t pin, bool value)
@@ -68,7 +84,7 @@ void gpioToggle (pin_t pin)
 
 bool gpioRead (pin_t pin)
 {
-	GPIO_Type* gpio	 	= gpios[PIN2PORT(pin)];
+	GPIO_Type* gpio = gpios[PIN2PORT(pin)];
 
 	return ((gpio->PDIR & (1U<<PIN2NUM(pin))) != 0)? HIGH:LOW;
 }

@@ -47,14 +47,19 @@
 #define	PIN_SSEG_MUX_1	PORTNUM2PIN(PC,7)
 
 // Encoder
-#define	PIN_ENCODER_A		PORTNUM2PIN(PC,3)
-#define	PIN_ENCODER_B		PORTNUM2PIN(PC,2)
-#define	PIN_ENCODER_SWITCH	PORTNUM2PIN(PD,1)
+#define	PIN_ENCODER_A		PORTNUM2PIN(PC,9)
+#define	PIN_ENCODER_B		PORTNUM2PIN(PC,8)
+
+#define	PIN_ENCODER_SWITCH	PORTNUM2PIN(PB,18)
 
 // LED's Informativos
 #define	PIN_INFO_LED_0	PORTNUM2PIN(PC,1)
 #define	PIN_INFO_LED_1	PORTNUM2PIN(PB,19)
 
+// USER Switches
+#define PIN_PLAY        PORTNUM2PIN(PC, 0)
+#define PIN_PREV        PORTNUM2PIN(PC, 16)
+#define PIN_NEXT        PORTNUM2PIN(PB, 11)
 
 // On Board User Switches
 #define PIN_SW2         PORTNUM2PIN(PC,6)
@@ -62,9 +67,6 @@
 
 //#define SW_PRESSED      LOW
 //#define SW_INPUT_TYPE   // ???
-
-#define PIN_PISR        PORTNUM2PIN(PE,24)
-#define PIN_DISR        PORTNUM2PIN(PE,25)
 
 /*******************************************************************************
  ******************************************************************************/

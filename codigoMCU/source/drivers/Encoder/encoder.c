@@ -5,10 +5,18 @@
  ******************************************************************************/
 #include "encoder.h"
 
+static uint8_t encoderLastState = 0;
+static int16_t turns = 0;
+
+static uint16_t btn_counter = 0;
+static encoder_btn_event_t btn_status = BTN_NOT;
+
+static void Encoder_Periodic_ISR(void);
+
 void encoderInit(void) {
-    gpioMode(PIN_ENCODER_A, INPUT_PULLUP);
-    gpioMode(PIN_ENCODER_B, INPUT_PULLUP);
-    gpioMode(PIN_ENCODER_SWITCH, INPUT_PULLUP);
+    gpioMode(PIN_ENCODER_A, INPUT);
+    gpioMode(PIN_ENCODER_B, INPUT);
+    gpioMode(PIN_ENCODER_SWITCH, INPUT);
 
     bool a = gpioRead(PIN_ENCODER_A);
     bool b = gpioRead(PIN_ENCODER_B);
