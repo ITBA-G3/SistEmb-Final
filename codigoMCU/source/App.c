@@ -112,6 +112,7 @@ static OS_SEM DisplaySem;
 static OS_SEM LedFrameSem;
 static OS_SEM g_mp3ReadySem;        // 
 
+volatile OS_SEM g_AudioSem;         // indica que hay datos de audio listos
 
 
 /*******************************************************************************
@@ -163,6 +164,11 @@ static void App_TaskCreate(void)
                     &err);
 
     OSSemCreate(&g_mp3ReadySem, "mp3_ready", 0, &err);
+
+    OSSemCreate(&g_AudioSem,
+                    "Audio semaphore",
+                    0u,
+                    &err);
 
     // Create tasks                
 
