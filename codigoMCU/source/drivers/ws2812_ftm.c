@@ -169,9 +169,6 @@ static bool ws_build_cnv_buffer(const uint8_t *buf, uint32_t len)
  */
 bool WS2_TransportSend(uint8_t *buf, uint32_t len)
 {
-//	if (ws_busy) return false;
-//	ws_busy = true;
-
 	static bool first_call_hardcoded_fix = true;
     if (!buf || len == 0) return false;
     if(first_call_hardcoded_fix){
@@ -229,9 +226,6 @@ void DMA_cb(void)
     FTM0->CNT = 0;
     FTM0->CONTROLS[0].CnV = 0;           // fuerza LOW al inicio
     FTM_ClearOverflowFlag(FTM0);
-
-    // Indica que la transferencia DMA ha finalizado
-//    ws_busy = false;
 
     ws_dma_done = true;
 }

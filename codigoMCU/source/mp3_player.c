@@ -204,7 +204,7 @@ bool MP3Player_DecodeAsMuchAsPossibleToRing(void)
 
     bool progressed = false;
 
-    for (;;) {
+    for (uint8_t i=0; i<3; i++) {
 
         // 1) Si no hay lugar, cortar
         if (pcm_ring_free() == 0) return progressed;
@@ -367,3 +367,13 @@ static uint32_t pcm_ring_push_left_block(const int16_t *pcm,
     return pushed;
 }
 
+bool is_mp3_file(const char *name)
+{
+    size_t len = strlen(name);
+    if (len < 4) return false;
+
+    return (name[len - 4] == '.' &&
+            tolower((unsigned char)name[len - 3]) == 'm' &&
+            tolower((unsigned char)name[len - 2]) == 'p' &&
+            tolower((unsigned char)name[len - 1]) == '3');
+}

@@ -27,6 +27,8 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 // #include <stdbool.h>
 #include <math.h>
 #include "hardware.h"
@@ -66,6 +68,9 @@ static void PIT_cb(void);
 #define MAX_NAME_LEN 64     // suficiente para pruebas; si querés LFN largo, subilo
 #endif
 
+#define MAX_TRACKS   64
+#define MAX_PATH_LEN 128
+
 
 /*******************************************************************************
  * CONSTANT AND MACRO DEFINITIONS USING #DEFINE
@@ -75,10 +80,10 @@ static void PIT_cb(void);
 // #endif
 
 // task priorities 
-#define MAIN_TASK_PRIO              8u
-#define AUDIO_TASK_PRIO             4u
-#define SD_TASK_PRIO                5u
-#define DISP_TASK_PRIO              6u
+#define MAIN_TASK_PRIO              3u
+#define AUDIO_TASK_PRIO             5u
+#define SD_TASK_PRIO                6u
+#define DISP_TASK_PRIO              4u
 #define LEDMATRIX_TASK_PRIO         7u
 
 // stack sizes (check this values)
@@ -111,7 +116,6 @@ typedef enum {
 } controlEvent_t ;
 static controlEvent_t currentEvent = APP_EVENT_NONE;
 static controlEvent_t SDEvent = APP_EVENT_NONE;
-static controlEvent_t displayEvent = APP_EVENT_NONE;
 
 /*******************************************************************************
  * RTOS OBJECTS DECLARATIONS
@@ -137,12 +141,10 @@ static OS_SEM g_mp3ReadySem;        //
 
 OS_SEM g_AudioSem;         // indica que hay datos de audio listos
 
-char * filenames[4] = {
-    "0:/TALKTO~1.MP3",
-    "track2.mp3",
-    "track3.mp3",
-    "track4.mp3"
-};
+char *filenames[MAX_TRACKS] = {"TALKTO~1.MP3"};
+static char filenames_storage[MAX_TRACKS][MAX_PATH_LEN];
+static uint32_t filenames_count = 0;
+static uint32_t filenamesIdx = 0;
 
 /*******************************************************************************
  * FUNCTION PROTOTYPES FOR PRIVATE FUNCTIONS WITH FILE LEVEL SCOPE
@@ -268,7 +270,8 @@ static void Main_Task(void *p_arg)
     init_user_buttons();
 
     write_LCD("Welcome!", 0);
-    OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
+    OSTimeDlyHMSM(0u, 0u, 3u, 0u, OS_OPT_TIME_HMSM_STRICT, &err);
+    OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
 
     while (1)
     {
@@ -313,35 +316,46 @@ static void Main_Task(void *p_arg)
                     case(APP_EVENT_ENC_BUTTON):
                         // guardar referencia a la canción que va a empezar a reproducir (SD)
                         // empezar transferencia SD → audio (SD decoder + audio + ledMatrix)
-                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                         // OSSemPost();
                         // isPlaying = true;
                         // currentState = APP_STATE_PLAYING;
                         // La transicion de estado se da despues de abrir el archivo MP3
-                        displayState= APP_STATE_SELECT_TRACK;
+                        displayState= APP_STATE_PLAYING;
                         SDState = APP_STATE_SELECT_TRACK;
                         currentState = APP_STATE_PLAYING;
+                        
                         SDEvent = currentEvent;
-                        displayEvent = currentEvent;
                         currentEvent = APP_EVENT_NONE;
+                        
+                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                         break;
                     case(APP_EVENT_ENC_RIGHT):
                         // actualiza display con la siguiente cancion
                         // puntero a la siguiente cancion
                         // SD browsing (metadata)
-                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
+                        filenamesIdx = (filenamesIdx + 1) % filenames_count;
+
+                        displayState= APP_STATE_SELECT_TRACK;
+                        SDState = APP_STATE_SELECT_TRACK;
+                        
                         SDEvent = currentEvent;
-                        displayEvent = currentEvent;
                         currentEvent = APP_EVENT_NONE;
+                        
+                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                         break;
                     case(APP_EVENT_ENC_LEFT):
                         // actualiza display con la cancion anterior
                         // puntero a la cancion anterior
                         // SD browsing (metadata)
-                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
+                        filenamesIdx = (filenamesIdx - 1 + filenames_count) % filenames_count;
+
+                        displayState= APP_STATE_SELECT_TRACK;
+                        SDState = APP_STATE_SELECT_TRACK;
+
                         SDEvent = currentEvent;
-                        displayEvent = currentEvent;
                         currentEvent = APP_EVENT_NONE;
+
+                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                         break;
                     default:
                 }
@@ -351,46 +365,51 @@ static void Main_Task(void *p_arg)
                 switch(currentEvent) {
                     case(APP_EVENT_NEXT_TRACK):
                         // empezar a reproducir el siguiente track
-                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                         SDEvent = currentEvent;
-                        displayEvent = currentEvent;
                         currentEvent = APP_EVENT_NONE;
+
+                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                         break;
                     case(APP_EVENT_PREV_TRACK):
                         // empezar a reproducir el track anterior
-                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                         SDEvent = currentEvent;
-                        displayEvent = currentEvent;
                         currentEvent = APP_EVENT_NONE;
+
+                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                         break;
                     case(APP_EVENT_PAUSE):
-                    // transitions between states
-                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
+                    case(APP_EVENT_ENC_BUTTON):
+                        // transitions between states
                         // pausar transferencia SD → audio (SD decoder + audio + ledMatrix)
                         // actualiza display para mostrar estado de pausa
                         isPlaying = false;
+                            
                         SDState = APP_STATE_PAUSED;
                         displayState = APP_STATE_PAUSED;
                         currentState = APP_STATE_PAUSED;
+                        
                         SDEvent = currentEvent;
-                        displayEvent = currentEvent;
                         currentEvent = APP_EVENT_NONE;
+                        
+                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                         break;
                     case(APP_EVENT_ENC_RIGHT):
                     case(APP_EVENT_ENC_LEFT):
-                    case(APP_EVENT_ENC_BUTTON):
-                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                         // pausar transferencia SD → audio (SD decoder + audio + ledMatrix)
                         // actualiza display con el menu
                         // puntero a la cancion anterior
                         // SD browsing (metadata)
+                        filenamesIdx = 0; // volver al primer track
                         isPlaying = false;
+
                         SDState = APP_STATE_SELECT_TRACK;
                         displayState = APP_STATE_SELECT_TRACK;
                         currentState = APP_STATE_SELECT_TRACK;
+                        
                         SDEvent = currentEvent;
-                        displayEvent = currentEvent;
                         currentEvent = APP_EVENT_NONE;
+
+                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                         break;
                     default:
                 }
@@ -398,29 +417,36 @@ static void Main_Task(void *p_arg)
         	case APP_STATE_PAUSED:
                 switch(currentEvent) {
                     case(APP_EVENT_PLAY):
-                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
+                    case(APP_EVENT_ENC_BUTTON):
                         // empezar transferencia SD → audio desde donde quedo (SD decoder + audio + ledMatrix)
                         // actualiza display para mostrar estado de playing
                         // isPlaying = true;
-                        SDState = APP_STATE_PAUSED;
-                        displayState = APP_STATE_PAUSED;
-                        displayEvent = currentEvent;
-                        SDEvent = currentEvent;
+                        DMA_SetEnableRequest(DMA_CH1, true);   //T
+                        isPlaying = true;
+
+                        SDState = APP_STATE_PLAYING;
+                        displayState = APP_STATE_PLAYING;
                         currentState = APP_STATE_PLAYING;
+
+                        SDEvent = currentEvent;
                         currentEvent = APP_EVENT_NONE;
+
+                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                         break;
                     case(APP_EVENT_ENC_RIGHT):
                     case(APP_EVENT_ENC_LEFT):
-                    case(APP_EVENT_ENC_BUTTON):
-                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
+                        filenamesIdx = 0; // volver al primer track
                         // ir a seleccion de track
                         isPlaying = false;
-                        SDState = APP_STATE_PAUSED;
-                        displayState = APP_STATE_PAUSED;
+                        
+                        SDState = APP_STATE_SELECT_TRACK;
+                        displayState = APP_STATE_SELECT_TRACK;
                         currentState = APP_STATE_SELECT_TRACK;
+                        
                         SDEvent = currentEvent;
-                        displayEvent = currentEvent;
                         currentEvent = APP_EVENT_NONE;
+
+                        OSSemPost(&DisplaySem, OS_OPT_POST_1, &err);
                         break;
                     // case(APP_EVENT_NEXT_TRACK):
                     //     // empezar a reproducir el siguiente track
@@ -446,15 +472,6 @@ static void Audio_Task(void *p_arg)
     (void)p_arg;
     OS_ERR err;
 
-    // while (pcm_ring_level() < (PCM_RING_SIZE / 8)) {
-    //     OSTimeDly(1u, OS_OPT_TIME_DLY, &err);
-    // }
-    
-    // uint32_t fs_mp3 = MP3Player_GetSampleRateHz();
-	//    gpioMode(PORTNUM2PIN(PC,10), OUTPUT);
-	// gpioWrite(PORTNUM2PIN(PC,10), 1);
-    
-
     OSSemPend(&g_mp3ReadySem, 0, OS_OPT_PEND_BLOCKING, NULL, &err);
     Audio_Init();
     // antes de arrancar DMA/audio
@@ -465,10 +482,10 @@ static void Audio_Task(void *p_arg)
                 OSSemPend(&g_AudioSem, 0u, OS_OPT_PEND_BLOCKING, 0u, &err);
                 Audio_Service();         
             }
-            // else
-            // {
-            //     // STOP DMA?
-            // }
+            else
+            {
+                DMA_SetEnableRequest(DMA_CH1, false);
+            }
         }
 }
 
@@ -484,29 +501,19 @@ static void Display_Task(void *p_arg)
             case(APP_STATE_PLAYING):
                 clear_LCD();
                 write_LCD("Playing", 0);
-                write_LCD(filenames[0], 1);
                 break;
             case(APP_STATE_PAUSED):
                 clear_LCD();
                 write_LCD("Paused", 0);
-                write_LCD(filenames[0], 1);
                 break;
             case(APP_STATE_SELECT_TRACK):
                 clear_LCD();
-                write_LCD("Menu", 0);
-                switch(displayEvent) {
-                    case(APP_EVENT_ENC_RIGHT):
-                        write_LCD("Encoder right", 1);
-                        break;
-                    case(APP_EVENT_ENC_LEFT):
-                        write_LCD("Encoder left", 1);
-                        break;
-                    default:
-                }
+                write_LCD("Select Track", 0);
                 break;
             default:
         }
-        displayEvent = APP_EVENT_NONE;
+        write_LCD(filenames[filenamesIdx], 1);
+        OSTimeDlyHMSM(0u, 0u, 0u, 50u, OS_OPT_TIME_HMSM_STRICT, &err);
     }
 }
 static void LedMatrix_Task(void *p_arg)
@@ -539,7 +546,6 @@ static void LedMatrix_Task(void *p_arg)
 
 		if(ok){
 			while (LEDM_TransferInProgress()) {
-//			    OSTimeDly(5u, OS_OPT_TIME_DLY, &err);
 				OSTimeDlyHMSM(0u, 0u, 0u, 20u, OS_OPT_TIME_HMSM_STRICT, &err);
 			}
 		}
@@ -568,32 +574,67 @@ static void SD_Task(void *p_arg)
         while (1) OSTimeDly(10u, OS_OPT_TIME_DLY, &err);
     }
 
-    // // 3) Abrir MP3
-    // fr = f_open(&g_song, "0:/TALKTO~1.MP3", FA_READ);
-    // if (fr != FR_OK) {
-    //     while (1) OSTimeDly(10u, OS_OPT_TIME_DLY, &err);
-    // }
+    DIR dir;
+    FILINFO fno;
+
+    filenames_count = 0;
+
+    #if FF_USE_LFN
+        // Si LFN está habilitado en FatFs
+        static char lfn[128];
+        fno.lfname = lfn;
+        fno.lfsize = sizeof(lfn);
+    #endif
+
+    filenames_count = 0;
+
+    fr = f_opendir(&dir, "0:/");
+    if (fr != FR_OK) return fr;
+
+    for (;;) {
+        fr = f_readdir(&dir, &fno);
+        if (fr != FR_OK) break;
+        if (fno.fname[0] == 0) break;          // fin
+
+        if (fno.fattrib & AM_DIR) continue;    // descartar directorios
+
+        const char *name =
+        #if FF_USE_LFN
+            (fno.lfname && fno.lfname[0]) ? fno.lfname : fno.fname;
+        #else
+            fno.fname;
+        #endif
+
+        if (!is_mp3_file(name)) continue;   // descartar no-mp3
+
+        // Guardar mientras haya espacio
+        if (filenames_count < MAX_TRACKS) {
+            // Guardar path completo en storage fijo
+            // OJO: si el nombre es muy largo, se trunca para no overflow.
+            char *dst = filenames_storage[filenames_count];
+
+            // Inicializar string vacío
+            dst[0] = '\0';
+
+            // Copiar "0:/"
+            strcpy(dst, "0:/");
+
+            // Concatenar nombre del archivo, cuidando overflow
+            strncat(dst, name, MAX_PATH_LEN - strlen(dst) - 1);
+
+            filenames[filenames_count] = filenames_storage[filenames_count];
+            filenames_count++;
+        } else {
+            break; // ya llenaste filenames[4]
+        }
+    }
+
+    f_closedir(&dir);
 
 
-    // OSSemPost(&g_mp3ReadySem, OS_OPT_POST_1, &err);
 
-    // while (pcm_ring_level() < (AUDIO_BUF_LEN * 12)) {   // 6 bloques, ajustá
-    //     MP3Player_DecodeAsMuchAsPossibleToRing();
-    // }
-
-    // // opcional: prellenar un poco antes de arrancar audio (ej 1/4 ring)
-    // while (pcm_ring_level() < (PCM_RING_SIZE / 4)) {
-    //     (void)MP3Player_DecodeOneFrameToRing();
-    // }
-
-    // 5) A partir de acá, el audio task puede ir pidiendo samples.
-    // Si querés, podés dormir esta task.
+    
     while (1) {
-        // Si hay espacio, decodificar más
-        // if (!MP3Player_DecodeAsMuchAsPossibleToRing()) {
-        //     // EOF/underrun: podés dormir o marcar stop
-        //     OSTimeDly(5u, OS_OPT_TIME_DLY, &err);
-        // }
         switch(SDState) {
             case(APP_STATE_PLAYING):
                 bool ok = MP3Player_DecodeAsMuchAsPossibleToRing();
@@ -614,14 +655,16 @@ static void SD_Task(void *p_arg)
                 switch(SDEvent) {
                     case(APP_EVENT_ENC_BUTTON):
                         // 3) Abrir MP3
-                        fr = f_open(&g_song, filenames[0], FA_READ);
+                        fr = f_open(&g_song, filenames[filenamesIdx], FA_READ);
                         if (fr != FR_OK) 
                             while (1) OSTimeDly(10u, OS_OPT_TIME_DLY, &err);
                         // 4) Inicializar Helix + buffers del player
                         if (!MP3Player_InitWithOpenFile(&g_song))
                             while (1) OSTimeDly(10u, OS_OPT_TIME_DLY, &err);
 
+                        DMA_SetEnableRequest(DMA_CH1, true);
                         isPlaying = true;
+
                         OSSemPost(&g_mp3ReadySem, OS_OPT_POST_1, &err);
                         SDState = APP_STATE_PLAYING;
                         break;
